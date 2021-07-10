@@ -7,7 +7,7 @@ import tensorflow as tf
 _MSCOCO_URL = "http://images.cocodataset.org"
 
 
-def download_mscoco_to(directory=None, version="2017"):
+def download_mscoco(directory=None, version="2017"):
     """
     Downloads the MS-COCO image captioning dataset.
 
