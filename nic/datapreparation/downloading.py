@@ -26,7 +26,7 @@ def download_mscoco_to(directory=None, version="2017"):
     if (not os.path.exists(directory)):
         raise FileNotFoundError(f"'{directory}' does not exist!")
 
-    return _do_download_mscoco_to(directory, version)
+    _do_download_mscoco_to(directory, version)
 
 
 def _do_download_mscoco_to(directory, version):
@@ -35,16 +35,14 @@ def _do_download_mscoco_to(directory, version):
     if (os.path.exists(annotations_dir)):
         shutil.rmtree(annotations_dir)
 
-    annotation_file = _download_annotations(directory, version)
+    _download_annotations(directory, version)
 
     images_dir = os.path.join(directory, f"train{version}")
 
     if (os.path.exists(images_dir)):
         shutil.rmtree(images_dir)
 
-    images_dir = _download_images(directory, version)
-
-    return (annotation_file, images_dir)
+    _download_images(directory, version)
 
 
 def _download_annotations(directory, version):
@@ -54,12 +52,7 @@ def _download_annotations(directory, version):
         origin=f"{_MSCOCO_URL}/annotations/annotations_trainval{version}.zip",
         extract=True
     )
-    annotation_file = os.path.join(os.path.dirname(annotation_zip),
-                                   "annotations",
-                                   f"captions_train{version}.json")
     os.remove(annotation_zip)
-
-    return annotation_file
 
 
 def _download_images(directory, version):
@@ -69,8 +62,4 @@ def _download_images(directory, version):
         origin=f"{_MSCOCO_URL}/zips/train{version}.zip",
         extract=True
     )
-    images_dir = os.path.join(os.path.dirname(images_zip),
-                              f"train{version}")
     os.remove(images_zip)
-
-    return images_dir
