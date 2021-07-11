@@ -1,7 +1,8 @@
 import os
-import shutil
 
 import tensorflow as tf
+
+from nic import utils
 
 
 _MSCOCO_URL = "http://images.cocodataset.org"
@@ -37,9 +38,7 @@ def _do_download_mscoco_to(directory, version):
 
 def _download_annotations(directory, version):
     annotations_dir = os.path.join(directory, "annotations")
-
-    if (os.path.exists(annotations_dir)):
-        shutil.rmtree(annotations_dir)
+    utils.remove_dir_if_exists(annotations_dir)
 
     annotation_zip = tf.keras.utils.get_file(
         "captions.zip",
@@ -52,9 +51,7 @@ def _download_annotations(directory, version):
 
 def _download_images(directory, zip_name):
     extracted_dir = os.path.join(directory, zip_name)
-
-    if (os.path.exists(extracted_dir)):
-        shutil.rmtree(extracted_dir)
+    utils.remove_dir_if_exists(extracted_dir)
 
     zip_name = f"{zip_name}.zip"
     images_zip = tf.keras.utils.get_file(
