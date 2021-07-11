@@ -30,22 +30,17 @@ def download_mscoco(directory=None, version="2017"):
 
 
 def _do_download_mscoco_to(directory, version):
+    _download_annotations(directory, version)
+    _download_images(directory, f"train{version}")
+    _download_images(directory, f"val{version}")
+
+
+def _download_annotations(directory, version):
     annotations_dir = os.path.join(directory, "annotations")
 
     if (os.path.exists(annotations_dir)):
         shutil.rmtree(annotations_dir)
 
-    _download_annotations(directory, version)
-
-    images_dir = os.path.join(directory, f"train{version}")
-
-    if (os.path.exists(images_dir)):
-        shutil.rmtree(images_dir)
-
-    _download_images(directory, version)
-
-
-def _download_annotations(directory, version):
     annotation_zip = tf.keras.utils.get_file(
         "captions.zip",
         cache_subdir=os.path.abspath(directory),
@@ -55,11 +50,17 @@ def _download_annotations(directory, version):
     os.remove(annotation_zip)
 
 
-def _download_images(directory, version):
+def _download_images(directory, zip_name):
+    extracted_dir = os.path.join(directory, zip_name)
+
+    if (os.path.exists(extracted_dir)):
+        shutil.rmtree(extracted_dir)
+
+    zip_name = f"{zip_name}.zip"
     images_zip = tf.keras.utils.get_file(
-        f"train{version}.zip",
+        zip_name,
         cache_subdir=os.path.abspath(directory),
-        origin=f"{_MSCOCO_URL}/zips/train{version}.zip",
+        origin=f"{_MSCOCO_URL}/zips/{zip_name}",
         extract=True
     )
     os.remove(images_zip)
