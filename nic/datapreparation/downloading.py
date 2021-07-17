@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import random
+from shutil import copy2 as copy_file
 
 import tensorflow as tf
 
@@ -86,6 +87,7 @@ def split_out_test_data(directory="mscoco", split=0.2, version="2017"):
     removes the annotations from the 'annotations' list in the first
     file and creates the second file which only contains the extracted
     annotations like so: `{"annotations": <annotations>}'.
+    A copy of the original train captions file is created as back up.
     """
     train_dir = os.path.join(directory, f"train{version}")
     test_images = _select_test_images(train_dir, split)
@@ -116,6 +118,7 @@ def _extract_captions(directory, version, test_images):
     annotations_dir = os.path.join(directory, "annotations")
     train_captions_path = os.path.join(annotations_dir,
                                        f"captions_train{version}.json")
+    copy_file(train_captions_path, f"{train_captions_path}.bkp")
     test_captions = _extract_test_captions_from(train_captions_path,
                                                 test_images)
     test_captions_path = os.path.join(annotations_dir,
