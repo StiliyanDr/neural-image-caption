@@ -32,5 +32,22 @@ def deserialise_from(path):
 
 
 def remove_dir_if_exists(directory):
-    if (os.path.exists(directory)):
+    if (os.path.isdir(directory)):
         shutil.rmtree(directory)
+
+
+def make_or_clear_dir(path):
+    if (os.path.isdir(path)):
+        shutil.rmtree(path)
+
+    os.mkdir(path)
+
+
+def verify_dir_exists(d):
+    if (not os.path.isdir(d)):
+        raise FileNotFoundError(f"'{d}' does not exist!")
+
+
+def make_dirs(paths):
+    for p in paths:
+        os.mkdir(p)
