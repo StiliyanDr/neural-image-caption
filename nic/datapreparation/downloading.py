@@ -82,6 +82,8 @@ def split_out_test_data(directory="mscoco",
     :param split: a float in the range (0, 1) - the percentage of train
     images to extract for testing. Defaults to `0.2` so 20%.
     :param version: a str - the dataset version. Defaults to "2017".
+    :param verbose: a boolean value indicating whether to show a status
+    bar for the progress. Defaults to `True`.
 
     Note that the train images are moved from 'train<version>' to a
     separate directory named 'test<version>' (overwritten if it exists).

@@ -2,6 +2,7 @@ from collections import defaultdict
 import json
 import os
 import pickle
+from tqdm import tqdm
 from typing import NamedTuple
 
 import tensorflow as tf
@@ -44,7 +45,8 @@ def preprocess_data(source_dir="mscoco",
                     version="2017",
                     image_options=ImageOptions(),
                     meta_tokens=MetaTokens(),
-                    max_words=None):
+                    max_words=None,
+                    verbose=True):
     """
     Preprocesses the MSCOCO dataset and stores the result on disk so
     that this can be done once and the result reused for each model
@@ -76,6 +78,8 @@ def preprocess_data(source_dir="mscoco",
     :param meta_tokens: an instance of MetaTokens.
     :param max_words: the maximum size of the captions dictionary. By
     default it is not limited.
+    :param verbose: a boolean value indicating whether to show a status
+    bar for the progress. Defaults to `True`.
     :raises FileNotFoundError: if the source directory does not exist.
     """
     utils.verify_dir_exists(source_dir)
@@ -87,13 +91,15 @@ def preprocess_data(source_dir="mscoco",
         target_subdir = target_subdirs[data_type]
         preprocess_images(source_images_dir,
                           target_subdir,
-                          _options_for(data_type, image_options))
+                          _options_for(data_type, image_options),
+                          verbose)
         preprocess_captions(source_dir,
                             target_subdir,
                             meta_tokens,
                             data_type,
                             version,
-                            max_words)
+                            max_words,
+                            verbose)
 
 
 def _create_target_structure(target_dir):
@@ -116,12 +122,15 @@ def _options_for(data_type, image_options):
 
 def preprocess_images(source_dir,
                       target_dir,
-                      options=ImageOptions()):
+                      options=ImageOptions(),
+                      verbose=True):
     """
     :param source_dir: a str - directory containing only image files.
     :param target_dir: a str - the directory where to store the
     preprocessed images (and optionally their features).
     :param options: an instance of ImageOptions.
+    :param verbose: a boolean value indicating whether to show a status
+    bar for the progress. Defaults to `True`.
 
     Note that each preprocessed image is a `tf.Tensor` which is pickled
     to a file in '<target_dir>/images' whose name is '<image id>.pcl'.
@@ -140,11 +149,14 @@ def preprocess_images(source_dir,
     else:
         utils.remove_dir_if_exists(features_dir)
 
-    for path, image_path, features_path in _images_in(
-        source_dir,
-        images_dir,
-        features_dir,
-    ):
+    image_paths = _images_in(source_dir, images_dir, features_dir)
+
+    if (verbose):
+        images_count = len(os.listdir(source_dir))
+        print(f"Preprocessing {images_count} images in '{source_dir}'.")
+        image_paths = tqdm(image_paths, total=images_count)
+
+    for path, image_path, features_path in image_paths:
         image = _preprocess_image(path, options)
         utils.serialise(image, image_path)
 
@@ -179,7 +191,8 @@ def preprocess_captions(source_dir,
                         meta_tokens=MetaTokens(),
                         type="train",
                         version="2017",
-                        max_words=None):
+                        max_words=None,
+                        verbose=True):
     """
     Loads the captions and if they are:
      - training: creates a tf.keras.preprocessing.text.Tokenizer
@@ -204,24 +217,29 @@ def preprocess_captions(source_dir,
     :param version: a str - the captions' version. Defaults to '2017'.
     :param max_words: the maximum size of the captions dictionary. By
     default it is not limited.
+    :param verbose: a boolean value indicating whether to show a status
+    bar for the progress. Defaults to `True`.
     """
     str_captions = _load_captions(source_dir,
                                   type,
                                   version,
-                                  meta_tokens)
+                                  meta_tokens,
+                                  verbose)
 
     if (type == "train"):
         tokenizer = _create_tokenizer_for(str_captions,
                                           meta_tokens,
                                           max_words)
-        int_captions = _vectorize_captions(str_captions, tokenizer)
+        int_captions = _vectorize_captions(str_captions,
+                                           tokenizer,
+                                           verbose)
         _save_captions(int_captions, target_dir)
         _save_tokenizer(tokenizer, target_dir)
     else:
         _save_captions(str_captions, target_dir)
 
 
-def _load_captions(data_dir, type, version, meta_tokens):
+def _load_captions(data_dir, type, version, meta_tokens, verbose):
     """
     Returns a dictionary mapping image ids (int) to lists of captions
     (strs) which are surrounded by the start and end meta tokens.
@@ -231,6 +249,10 @@ def _load_captions(data_dir, type, version, meta_tokens):
 
     with open(path) as file:
         contents = json.load(file)["annotations"]
+
+    if (verbose):
+        print(f"Loading {len(contents)} captions from '{path}'.")
+        contents = tqdm(contents)
 
     captions = defaultdict(list)
 
@@ -258,10 +280,17 @@ def _create_tokenizer_for(captions, meta_tokens, max_words=None):
     return tokenizer
 
 
-def _vectorize_captions(captions, tokenizer):
+def _vectorize_captions(captions, tokenizer, verbose):
+    pairs = captions.items()
+
+    if (verbose):
+        count = len(captions)
+        print(f"Tokenizing captions for {count} images.")
+        pairs = tqdm(pairs, total=count)
+
     return {
         image_id: tokenizer.texts_to_sequences(caps)
-        for image_id, caps in captions.items()
+        for image_id, caps in pairs
     }
 
 
