@@ -5,6 +5,7 @@ import random
 from shutil import copy2 as copy_file
 
 import tensorflow as tf
+from tqdm import tqdm
 
 from nic import utils
 
@@ -67,7 +68,10 @@ def _download_images(directory, zip_name):
     os.remove(images_zip)
 
 
-def split_out_test_data(directory="mscoco", split=0.2, version="2017"):
+def split_out_test_data(directory="mscoco",
+                        split=0.2,
+                        version="2017",
+                        verbose=True):
     """
     Randomly selects a set of train images (with random.shuffle) and
     moves them to a separate directory for testing purposes. Also
@@ -94,8 +98,8 @@ def split_out_test_data(directory="mscoco", split=0.2, version="2017"):
 
     test_dir = os.path.join(directory, f"test{version}")
     utils.make_or_clear_dir(test_dir)
-    _move_images(train_dir, test_dir, test_images)
-    _extract_captions(directory, version, test_images)
+    _move_images(train_dir, test_dir, test_images, verbose)
+    _extract_captions(directory, version, test_images, verbose)
 
 
 def _select_test_images(directory, split):
@@ -106,7 +110,12 @@ def _select_test_images(directory, split):
     return images[:count]
 
 
-def _move_images(source, dest, images):
+def _move_images(source, dest, images, verbose):
+    if (verbose):
+        print(f"Moving {len(images)} images "
+              f"from '{source}' to '{dest}'.")
+        images = tqdm(images)
+
     for i in images:
         os.rename(
             os.path.join(source, i),
@@ -114,19 +123,20 @@ def _move_images(source, dest, images):
         )
 
 
-def _extract_captions(directory, version, test_images):
+def _extract_captions(directory, version, test_images, verbose):
     annotations_dir = os.path.join(directory, "annotations")
     train_captions_path = os.path.join(annotations_dir,
                                        f"captions_train{version}.json")
     copy_file(train_captions_path, f"{train_captions_path}.bkp")
     test_captions = _extract_test_captions_from(train_captions_path,
-                                                test_images)
+                                                test_images,
+                                                verbose)
     test_captions_path = os.path.join(annotations_dir,
                                       f"captions_test{version}.json")
     _dump_to_file(test_captions, test_captions_path)
 
 
-def _extract_test_captions_from(path, test_images):
+def _extract_test_captions_from(path, test_images, verbose):
     with open(path) as file:
         file_contents = json.load(file)
 
@@ -134,8 +144,16 @@ def _extract_test_captions_from(path, test_images):
                       for name in test_images}
     all_captions = file_contents["annotations"]
     test_captions = []
+    reversed_indexes = range(len(all_captions) - 1, -1, -1)
 
-    for i, caption in enumerate(copy.copy(all_captions)):
+    if (verbose):
+        print(f"Extracting captions for {len(test_images)} test "
+              f"images from {len(all_captions)} captions in '{path}'.")
+        reversed_indexes = tqdm(reversed_indexes)
+
+    for i in reversed_indexes:
+        caption = all_captions[i]
+
         if (caption["image_id"] in test_image_ids):
             del all_captions[i]
             test_captions.append(caption)
