@@ -144,8 +144,7 @@ def _images_in(directory, images_dir, features_dir):
     for name in os.listdir(directory):
         path = os.path.join(directory, name)
 
-        end = name.rfind(".")
-        image_id = name[:end].lstrip("0")
+        image_id = utils.image_name_to_id(name)
         new_name = f"{image_id}.pcl"
         image_path = os.path.join(images_dir, new_name)
         features_path = os.path.join(features_dir, new_name)

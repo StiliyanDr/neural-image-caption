@@ -51,3 +51,8 @@ def verify_dir_exists(d):
 def make_dirs(paths):
     for p in paths:
         os.mkdir(p)
+
+
+def image_name_to_id(name):
+    end = name.rfind(".")
+    return int(name[:end].lstrip("0"))
