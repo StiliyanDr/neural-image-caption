@@ -75,7 +75,7 @@ def preprocess_data(source_dir="mscoco",
     :raises FileNotFoundError: if the source directory does not exist.
     """
     utils.verify_dir_exists(source_dir)
-    target_subdirs = _create_target_structure(target_dir, version)
+    target_subdirs = _create_target_structure(target_dir)
 
     for data_type in ["val", "train"]:
         source_images_dir = os.path.join(source_dir,
@@ -92,7 +92,7 @@ def preprocess_data(source_dir="mscoco",
                             max_words)
 
 
-def _create_target_structure(target_dir, version):
+def _create_target_structure(target_dir):
     utils.make_or_clear_dir(target_dir)
     train_dir = os.path.join(target_dir, "train")
     validation_dir = os.path.join(target_dir, "val")
