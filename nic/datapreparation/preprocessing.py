@@ -54,16 +54,20 @@ def preprocess_data(source_dir="mscoco",
     a path to the directory D where to store the preprocessed data,
     this function:
      - clears D or creates it if it does not exist
-     - creates two subdirectories in D: train and val
+     - creates three subdirectories in D: train, test and val
      - preprocesses each image and pickles the `tf.Tensor` in
-       'D/<train or val>/images/<image id>.pcl'. Similarly, features
-       extracted for an image (if requested) are pickled to files (named
-       the same way) in 'D/<train or val>/features'
-     - loads the captions, creates a tf.keras.preprocessing.text.Tokenizer
-       for them, builds a dictionary mapping image ids (int) to a list
-       of int sequences (the word indices) and saves the tokenizer and
-       mapping to files in 'D/<train or val>' - 'captions.pcl' and
-       'tokenizer.json', respectively.
+       'D/<train, test or val>/images/<image id>.pcl'. Similarly,
+       features extracted for an image (if requested) are pickled to
+       files (named the same way) in 'D/<train or val>/features'
+     - loads the train captions, creates a
+       `tf.keras.preprocessing.text.Tokenizer` for them, builds a
+       dictionary mapping image ids (int) to a list of int sequences
+       (the word indices) and saves the tokenizer and mapping to files
+       in 'D/train' - 'captions.pcl' and 'tokenizer.json', respectively.
+       The validation and test captions are loaded into dictionaries
+       mapping image ids to lists of strs - the original captions
+       enclosed with the start and end metatokens. These dictionaries
+       are saved in 'D/<test or val>/captions.pcl'.
 
     :param source_dir: a str - the directory storing the dataset.
     :param target_dir: a str - the directory where to store the result.
@@ -77,13 +81,13 @@ def preprocess_data(source_dir="mscoco",
     utils.verify_dir_exists(source_dir)
     target_subdirs = _create_target_structure(target_dir)
 
-    for data_type in ["val", "train"]:
+    for data_type in ["val", "test", "train"]:
         source_images_dir = os.path.join(source_dir,
                                          f"{data_type}{version}")
         target_subdir = target_subdirs[data_type]
         preprocess_images(source_images_dir,
                           target_subdir,
-                          image_options)
+                          _options_for(data_type, image_options))
         preprocess_captions(source_dir,
                             target_subdir,
                             meta_tokens,
@@ -96,9 +100,18 @@ def _create_target_structure(target_dir):
     utils.make_or_clear_dir(target_dir)
     train_dir = os.path.join(target_dir, "train")
     validation_dir = os.path.join(target_dir, "val")
-    utils.make_dirs([train_dir, validation_dir])
+    test_dir = os.path.join(target_dir, "test")
+    utils.make_dirs([train_dir, validation_dir, test_dir])
 
-    return {"train": train_dir, "val": validation_dir}
+    return {"train": train_dir, "val": validation_dir, "test": test_dir}
+
+
+def _options_for(data_type, image_options):
+    return (image_options
+            if (data_type != "test")
+            else image_options._replace(
+                feature_extractor=None
+            ))
 
 
 def preprocess_images(source_dir,
@@ -173,10 +186,10 @@ def preprocess_captions(source_dir,
        for them, builds a dictionary mapping image ids (int) to a list
        of int sequences (the word indices) and stores the tokenizer and
        mapping on disk so that they can be reused for training
-    - validation: builds a dictionary mapping image ids (int) to a list
-       of str captions (the original captions enclosed with the start
-       and end tokens) and stores the mapping on disk so that it can be
-       reused for validation
+    - test or validation: builds a dictionary mapping image ids (int) to
+      a list of str captions (the original captions enclosed with the
+      start and end tokens) and stores the mapping on disk so that it
+      can be reused for test/validation
 
     :param source_dir: a str - the directory where the mscoco dataset is
     stored.
@@ -186,8 +199,8 @@ def preprocess_captions(source_dir,
     :param meta_tokens: an instance of MetaTokens - the meta tokens to
     use for the captions dictionary. Default ones can be used by
     omitting this argument.
-    :param type: str - the type of captions to be loaded; 'val' or
-    'train'. Defaults to 'train'.
+    :param type: str - the type of captions to be loaded; 'val', 'test'
+    or 'train'. Defaults to 'train'.
     :param version: a str - the captions' version. Defaults to '2017'.
     :param max_words: the maximum size of the captions dictionary. By
     default it is not limited.
