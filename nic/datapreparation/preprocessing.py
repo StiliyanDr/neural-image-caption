@@ -169,10 +169,15 @@ def preprocess_captions(source_dir,
                         version="2017",
                         max_words=None):
     """
-    Loads the captions, creates a tf.keras.preprocessing.text.Tokenizer
-    for them, builds a dictionary mapping image ids (int) to a list of
-    int sequences (the word indices) and stores the tokenizer and
-    mapping on disk so that they can be reused for training.
+    Loads the captions and if they are:
+     - training: creates a tf.keras.preprocessing.text.Tokenizer
+       for them, builds a dictionary mapping image ids (int) to a list
+       of int sequences (the word indices) and stores the tokenizer and
+       mapping on disk so that they can be reused for training
+    - validation: builds a dictionary mapping image ids (int) to a list
+       of str captions (the original captions enclosed with the start
+       and end tokens) and stores the mapping on disk so that it can be
+       reused for validation
 
     :param source_dir: a str - the directory where the mscoco dataset is
     stored.
@@ -192,11 +197,16 @@ def preprocess_captions(source_dir,
                                   type,
                                   version,
                                   meta_tokens)
-    tokenizer = _create_tokenizer_for(str_captions,
-                                      meta_tokens,
-                                      max_words)
-    int_captions = _vectorize_captions(str_captions, tokenizer)
-    _save_captions_and_tokenizer(int_captions, tokenizer, target_dir)
+
+    if (type == "train"):
+        tokenizer = _create_tokenizer_for(str_captions,
+                                          meta_tokens,
+                                          max_words)
+        int_captions = _vectorize_captions(str_captions, tokenizer)
+        _save_captions(int_captions, target_dir)
+        _save_tokenizer(tokenizer, target_dir)
+    else:
+        _save_captions(str_captions, target_dir)
 
 
 def _load_captions(data_dir, type, version, meta_tokens):
@@ -243,15 +253,15 @@ def _vectorize_captions(captions, tokenizer):
     }
 
 
-def _save_captions_and_tokenizer(captions,
-                                 tokenizer,
-                                 target_dir):
-    captions_path = os.path.join(target_dir, "captions.pcl")
-
-    with open(captions_path, "wb") as file:
-        pickle.dump(captions, file)
-
+def _save_tokenizer(tokenizer, target_dir):
     tokenizer_path = os.path.join(target_dir, "tokenizer.json")
 
     with open(tokenizer_path, "w") as file:
         file.write(tokenizer.to_json())
+
+
+def _save_captions(caps, target_dir):
+    captions_path = os.path.join(target_dir, "captions.pcl")
+
+    with open(captions_path, "wb") as file:
+        pickle.dump(caps, file)
