@@ -1,4 +1,7 @@
+import copy
+import json
 import os
+import random
 
 import tensorflow as tf
 
@@ -61,3 +64,85 @@ def _download_images(directory, zip_name):
         extract=True
     )
     os.remove(images_zip)
+
+
+def split_out_test_data(directory="mscoco", split=0.2, version="2017"):
+    """
+    Randomly selects a set of train images (with random.shuffle) and
+    moves them to a separate directory for testing purposes. Also
+    extracts their captions to a separate file.
+
+    :param directory: a str - the directory storing the mscoco dataset.
+    Defaults to 'mscoco'.
+    :param split: a float in the range (0, 1) - the percentage of train
+    images to extract for testing. Defaults to `0.2` so 20%.
+    :param version: a str - the dataset version. Defaults to "2017".
+
+    Note that the train images are moved from 'train<version>' to a
+    separate directory named 'test<version>' (overwritten if it exists).
+    Their annotations are extracted from
+    'annotations/captions_train<version>.json' to
+    'annotations/captions_test<version>.json' but this extraction simply
+    removes the annotations from the 'annotations' list in the first
+    file and creates the second file which only contains the extracted
+    annotations like so: `{"annotations": <annotations>}'.
+    """
+    train_dir = os.path.join(directory, f"train{version}")
+    test_images = _select_test_images(train_dir, split)
+
+    test_dir = os.path.join(directory, f"test{version}")
+    utils.make_or_clear_dir(test_dir)
+    _move_images(train_dir, test_dir, test_images)
+    _extract_captions(directory, version, test_images)
+
+
+def _select_test_images(directory, split):
+    images = os.listdir(directory)
+    random.shuffle(images)
+    count = int(len(images) * split)
+
+    return images[:count]
+
+
+def _move_images(source, dest, images):
+    for i in images:
+        os.rename(
+            os.path.join(source, i),
+            os.path.join(dest, i)
+        )
+
+
+def _extract_captions(directory, version, test_images):
+    annotations_dir = os.path.join(directory, "annotations")
+    train_captions_path = os.path.join(annotations_dir,
+                                       f"captions_train{version}.json")
+    test_captions = _extract_test_captions_from(train_captions_path,
+                                                test_images)
+    test_captions_path = os.path.join(annotations_dir,
+                                      f"captions_test{version}.json")
+    _dump_to_file(test_captions, test_captions_path)
+
+
+def _extract_test_captions_from(path, test_images):
+    with open(path) as file:
+        file_contents = json.load(file)
+
+    test_image_ids = {utils.image_name_to_id(name)
+                      for name in test_images}
+    all_captions = file_contents["annotations"]
+    test_captions = []
+
+    for i, caption in enumerate(copy.copy(all_captions)):
+        if (caption["image_id"] in test_image_ids):
+            del all_captions[i]
+            test_captions.append(caption)
+
+    with open(path, "w") as file:
+        json.dump(file_contents, file)
+
+    return test_captions
+
+
+def _dump_to_file(test_captions, path):
+    with open(path, "w") as file:
+        json.dump({"annotations": test_captions}, file)
