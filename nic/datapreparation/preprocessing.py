@@ -1,4 +1,5 @@
 from collections import defaultdict
+import itertools
 import json
 import os
 import pickle
@@ -270,7 +271,8 @@ def preprocess_captions(source_dir,
                                   verbose)
 
     if (type == "train"):
-        tokenizer = _create_tokenizer_for(str_captions,
+        all_captions = list(itertools.chain(str_captions.values()))
+        tokenizer = _create_tokenizer_for(all_captions,
                                           meta_tokens,
                                           max_words)
         int_captions = _vectorize_captions(str_captions,
