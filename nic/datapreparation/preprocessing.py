@@ -178,7 +178,7 @@ def _images_in(directory, options):
     def load_image(path):
         image = tf.io.read_file(path)
         image = tf.image.decode_jpeg(image, channels=3)
-        return tf.image.resize(image, options.target_size)
+        return (tf.image.resize(image, options.target_size), path)
 
     image_paths = [os.path.join(directory, name)
                    for name in os.listdir(directory)]
@@ -210,7 +210,9 @@ def _serialise_batch(images_batch,
     for image, features, path in zip(images_batch,
                                      features_batch,
                                      paths_batch):
-        image_id = utils.image_name_to_id(utils.short_name_for(path))
+        image_id = utils.image_name_to_id(
+            utils.short_name_for(path.numpy().decode())
+        )
         new_name = f"{image_id}.pcl"
 
         image_path = os.path.join(images_dir, new_name)
