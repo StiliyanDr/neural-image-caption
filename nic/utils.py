@@ -56,3 +56,8 @@ def make_dirs(paths):
 def image_name_to_id(name):
     end = name.rfind(".")
     return int(name[:end].lstrip("0"))
+
+
+def short_name_for(path):
+    start = path.rfind(os.sep)
+    return path[start + 1:]

@@ -5,6 +5,7 @@ import pickle
 from tqdm import tqdm
 from typing import NamedTuple
 
+import numpy as np
 import tensorflow as tf
 
 from nic import utils
@@ -19,15 +20,18 @@ class ImageOptions(NamedTuple):
      - target_size: a 2-tuple of integers - the spatial size of the
        image, as expected by the chosen model
      - feature_extractor: a callable taking and returning a `tf.Tensor`.
-       If provided, this function will extract features for each of
-       the preprocessed images. This is useful when doing transfer
+       If provided, this function will extract features for a batch of
+       preprocessed images. This is useful when doing transfer
        learning and the feature extracting module of the model is frozen.
        Extracting the features once and reusing them to train the layers
        on top of it is more efficient
+     - batch_size: an int - the batch size to use when preprocessing
+       (and extracting features for) the images
     """
     model_name: str = "inception_resnet_v2"
     target_size: tuple = (299, 299)
     feature_extractor: object = None
+    batch_size: int = 16
 
 
 class MetaTokens(NamedTuple):
@@ -142,48 +146,85 @@ def preprocess_images(source_dir,
     utils.make_or_clear_dir(images_dir)
 
     features_dir = os.path.join(target_dir, "features")
-    feature_extraction_requested = options.feature_extractor is not None
 
-    if (feature_extraction_requested):
+    if (options.feature_extractor is not None):
         utils.make_or_clear_dir(features_dir)
     else:
         utils.remove_dir_if_exists(features_dir)
 
-    image_paths = _images_in(source_dir, images_dir, features_dir)
+    images, images_count = _images_in(source_dir, options)
+    model = getattr(tf.keras.applications, options.model_name)
 
     if (verbose):
-        images_count = len(os.listdir(source_dir))
-        print(f"Preprocessing {images_count} images in '{source_dir}'.")
-        image_paths = tqdm(image_paths, total=images_count)
+        batches_count = _batches_count_for(images_count,
+                                           options.batch_size)
+        print(f"Preprocessing {images_count} images in '{source_dir}' "
+              f"with a batch size of {options.batch_size}.")
+        images = tqdm(images, total=batches_count)
 
-    for path, image_path, features_path in image_paths:
-        image = _preprocess_image(path, options)
+    for images_batch, paths_batch in images:
+        preprocessed_batch = model.preprocess_input(images_batch)
+        features_batch = (options.feature_extractor(preprocessed_batch)
+                          if (options.feature_extractor is not None)
+                          else None)
+        _serialise_batch(preprocessed_batch,
+                         features_batch,
+                         paths_batch,
+                         features_dir,
+                         images_dir)
+
+
+def _images_in(directory, options):
+    def load_image(path):
+        image = tf.io.read_file(path)
+        image = tf.image.decode_jpeg(image, channels=3)
+        return tf.image.resize(image, options.target_size)
+
+    image_paths = [os.path.join(directory, name)
+                   for name in os.listdir(directory)]
+    image_dataset = tf.data.Dataset.from_tensor_slices(
+        np.array(image_paths)
+    )
+    image_dataset = image_dataset.map(
+        load_image,
+        num_parallel_calls=tf.data.AUTOTUNE
+    ).batch(options.batch_size)
+
+    return (image_dataset, len(image_paths))
+
+
+def _batches_count_for(total_items, batch_size):
+    quotient, remainder = divmod(total_items, batch_size)
+    return quotient + int(remainder != 0)
+
+
+def _serialise_batch(images_batch,
+                     features_batch,
+                     paths_batch,
+                     features_dir,
+                     images_dir):
+    features_batch = _yield_nones_if_missing(
+        features_batch,
+        count=images_batch.shape[0]
+    )
+    for image, features, path in zip(images_batch,
+                                     features_batch,
+                                     paths_batch):
+        image_id = utils.image_name_to_id(utils.short_name_for(path))
+        new_name = f"{image_id}.pcl"
+
+        image_path = os.path.join(images_dir, new_name)
         utils.serialise(image, image_path)
 
-        if (feature_extraction_requested):
-            features = options.feature_extractor(image)
+        if (features is not None):
+            features_path = os.path.join(features_dir, new_name)
             utils.serialise(features, features_path)
 
 
-def _images_in(directory, images_dir, features_dir):
-    for name in os.listdir(directory):
-        path = os.path.join(directory, name)
-
-        image_id = utils.image_name_to_id(name)
-        new_name = f"{image_id}.pcl"
-        image_path = os.path.join(images_dir, new_name)
-        features_path = os.path.join(features_dir, new_name)
-
-        yield (path, image_path, features_path)
-
-
-def _preprocess_image(path, options):
-    image = tf.io.read_file(path)
-    image = tf.image.decode_jpeg(image, channels=3)
-    image = tf.image.resize(image, options.target_size)
-    model = getattr(tf.keras.applications, options.model_name)
-
-    return model.preprocess_input(image)
+def _yield_nones_if_missing(iterable, count):
+    return (iterable
+            if (iterable is not None)
+            else (None for _ in range(count)))
 
 
 def preprocess_captions(source_dir,
