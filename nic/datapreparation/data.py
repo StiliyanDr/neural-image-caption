@@ -76,5 +76,15 @@ def load_tokenizer(path):
     )
 
 
+def vocabulary_size(path):
+    """
+    :param path: a str - the path where preprocessed data is stored.
+    :returns: an int - the size of the vocabulary obtained from train
+    data.
+    """
+    tokenizer = load_tokenizer(path)
+    return len(tokenizer.word_index)
+
+
 def _load_image(path, caption):
     return (utils.deserialise_from(path.decode()).numpy(), caption)
