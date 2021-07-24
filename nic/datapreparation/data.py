@@ -3,7 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from nic import utils
+from nic.datapreparation import utils
 
 
 def load_data(path, type, load_as_features=False):

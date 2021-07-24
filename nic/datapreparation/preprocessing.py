@@ -9,7 +9,7 @@ from typing import NamedTuple
 import numpy as np
 import tensorflow as tf
 
-from nic import utils
+from nic.datapreparation import utils
 
 
 class ImageOptions(NamedTuple):

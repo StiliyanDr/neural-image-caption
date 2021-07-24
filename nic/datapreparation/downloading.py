@@ -6,7 +6,7 @@ from shutil import copy2 as copy_file
 import tensorflow as tf
 from tqdm import tqdm
 
-from nic import utils
+from nic.datapreparation import utils
 
 
 _MSCOCO_URL = "http://images.cocodataset.org"
