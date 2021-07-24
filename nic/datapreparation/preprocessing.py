@@ -271,7 +271,9 @@ def preprocess_captions(source_dir,
                                   verbose)
 
     if (type == "train"):
-        all_captions = list(itertools.chain(str_captions.values()))
+        all_captions = list(itertools.chain.from_iterable(
+            str_captions.values()
+        ))
         tokenizer = _create_tokenizer_for(all_captions,
                                           meta_tokens,
                                           max_words)
