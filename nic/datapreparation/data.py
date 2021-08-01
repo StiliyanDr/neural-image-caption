@@ -16,49 +16,73 @@ def load_data(path, type, load_as_features=False):
     load the image features. If `False`, the actual images are loaded;
     this should be used only for fine tuning and testing. Defaults to
     `False` and is ignored for `type='test'`.
-    :returns: a tf.data.Dataset which yields pairs of image tensors
-    (feature vectors if `load_as_features` is set to `True`) and
-    integer sequences (vectors). Note that it is not batched.
+    :returns: a tf.data.Dataset which yields 3-tuples whose components
+     are :
+      - image tensors (feature vectors if `load_as_features` is set to
+        `True`)
+      - integer sequences (vectors) which represent the captions,
+        without the end meta token at the end
+      - integer sequences (vectors) which represent the captions,
+        without the start meta token in front
     """
     data_subdir = os.path.join(path, type)
-    captions = utils.deserialise_from(os.path.join(data_subdir,
-                                                   "captions.pcl"))
-    tokenizer = (load_tokenizer(path)
-                 if (type != "train")
-                 else None)
+    captions = utils.deserialise_from(
+        os.path.join(data_subdir, "captions.pcl")
+    )
     images_dir = os.path.join(data_subdir,
                               ("features"
-                              if (load_as_features and type != "test")
-                              else "images"))
-    image_paths = []
-    all_captions = []
-
-    for image_id, caps in captions.items():
-        image_path = os.path.join(images_dir, f"{image_id}.pcl")
-        image_paths.extend(image_path for _ in caps)
-
-        if (tokenizer is not None):
-            caps = tokenizer.texts_to_sequences(caps)
-
-        all_captions.extend(caps)
-
-    all_captions = tf.keras.preprocessing.sequence.pad_sequences(
-        all_captions,
-        padding="post"
-    )
-
+                               if (load_as_features and type != "test")
+                               else "images"))
+    image_paths, all_captions = _vectorise(captions, images_dir, path)
     image_dataset = tf.data.Dataset.from_tensor_slices(
-        (np.array(image_paths), all_captions)
+        (image_paths, all_captions)
     )
+
     return image_dataset.map(
         lambda path, caption:
         tf.numpy_function(
             _load_image,
             [path, caption],
-            [tf.float32, tf.int32]
+            [tf.float32, tf.int32, tf.int32]
         ),
         num_parallel_calls=tf.data.AUTOTUNE
     )
+
+
+def _vectorise(captions, images_dir, path):
+    tokenizer = load_tokenizer(path)
+    image_paths = []
+    source_captions, target_captions = [], []
+
+    for image_id, caps in captions.items():
+        image_path = os.path.join(images_dir, f"{image_id}.pcl")
+        image_paths.extend(image_path for _ in caps)
+
+        caps = tokenizer.texts_to_sequences(caps)
+        source_captions.extend(c[:-1] for c in caps)
+        target_captions.extend(c[1:] for c in caps)
+
+    source_captions = tf.keras.preprocessing.sequence.pad_sequences(
+        source_captions,
+        padding="post"
+    )
+    target_captions = tf.keras.preprocessing.sequence.pad_sequences(
+        target_captions,
+        padding="post"
+    )
+    all_captions = np.concatenate(
+        [source_captions[:, np.newaxis, :],
+         target_captions[:, np.newaxis, :]],
+        axis=1
+    )
+
+    return (np.array(image_paths), all_captions)
+
+
+def _load_image(path, caption):
+    return (utils.deserialise_from(path.decode()).numpy(),
+            caption[0, :],
+            caption[1, :])
 
 
 def load_tokenizer(path):
@@ -84,7 +108,3 @@ def vocabulary_size(path):
     """
     tokenizer = load_tokenizer(path)
     return len(tokenizer.word_index)
-
-
-def _load_image(path, caption):
-    return (utils.deserialise_from(path.decode()).numpy(), caption)
