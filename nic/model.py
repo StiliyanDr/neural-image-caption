@@ -43,7 +43,7 @@ def define_decoder_model(features_size,
      - features: (batch_size, features_size)
      - captions: (batch_size, max_seq_len)
     and whose output is:
-     - word projections: (batch_size, vocabulary_size)
+     - word projections: (batch_size, max_seq_len, vocabulary_size)
     Use keras.utils.plot_model to view the entire model.
     """
     features_input = layers.Input(shape=(features_size,),
@@ -66,29 +66,31 @@ def define_decoder_model(features_size,
     )(captions_input)
 
     c_state = tf.zeros_like(transformed_features)
+    # (batch_size, max_seq_len, hidden_size)
     # (batch_size, hidden_size)
-    decoded_caption, h_state, c_state = layers.LSTM(
+    decoded_captions, h_state, c_state = layers.LSTM(
         rnn_options.size,
         dropout=rnn_options.dropout,
         recurrent_dropout=rnn_options.recurrent_dropout,
         go_backwards=rnn_options.reverse_sequence,
+        return_sequences=True,
         return_state=True,
         name="decoder"
     )(embedded_captions, initial_state=[transformed_features, c_state])
 
-    # (batch_size, hidden_size)
-    transformed_caption = layers.Dense(
+    # (batch_size, max_seq_len, hidden_size)
+    transformed_captions = layers.Dense(
         rnn_options.size,
         activation="relu",
         name="pre-projection-transformation"
-    )(decoded_caption)
+    )(decoded_captions)
 
-    # (batch_size, vocabulary_size)
+    # (batch_size, max_seq_len, vocabulary_size)
     word_projection = layers.Dense(
         vocabulary_size,
         activation="relu",
         name="word-projection"
-    )(transformed_caption)
+    )(transformed_captions)
 
     return keras.Model(inputs=[features_input, captions_input],
                        outputs=word_projection,
@@ -136,7 +138,7 @@ def connect(decoder_model, *,
      - images: (batch_size, image_shape...)
      - captions: (batch_size, max_seq_len)
     and whose output is:
-     - word projections: (batch_size, vocabulary_size)
+     - word projections: (batch_size, max_seq_len, vocabulary_size)
     Use keras.utils.plot_model to view the entire model.
     """
     if (encoder_model is None):
@@ -170,7 +172,7 @@ def define_model(vocabulary_size,
      - images: (batch_size, 299, 299, 3)
      - captions: (batch_size, max_seq_len)
     and whose output is:
-     - word projections: (batch_size, vocabulary_size)
+     - word projections: (batch_size, max_seq_len, vocabulary_size)
     Use keras.utils.plot_model to view the entire model.
     """
     encoder = define_encoder_model()
