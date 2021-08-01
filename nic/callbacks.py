@@ -1,9 +1,9 @@
 from tensorflow import keras
 
 
-_CHECKPOINT_PATTERN = ("perplexity={val_perplexity:.2f}_"
-                       "loss={val_loss:.2f}_"
-                       "epoch={epoch:02d}.ckpt")
+CHECKPOINT_PATTERN = ("perplexity={val_perplexity:.2f}_"
+                      "loss={val_loss:.2f}_"
+                      "epoch={epoch:02d}.ckpt")
 
 
 def tensor_board(log_dir, update_frequency="epoch"):
@@ -30,7 +30,7 @@ def tensor_board(log_dir, update_frequency="epoch"):
     )
 
 
-def checkpoint(path_pattern=_CHECKPOINT_PATTERN,
+def checkpoint(path_pattern=CHECKPOINT_PATTERN,
                frequency="epoch"):
     """
     Creates and returns a ModelChekpoint callback.
