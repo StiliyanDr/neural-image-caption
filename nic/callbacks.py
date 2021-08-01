@@ -89,6 +89,25 @@ def learning_rate_reduction(factor=0.9,
     )
 
 
+def early_stopping(delta=0.001, patience=3):
+    """
+    Creates and returns an `EarlyStopping` callback.
+
+    :param delta: a float - the minimum change in perplexity that
+    qualifies as an improvement. Defaults to 0.001.
+    :param patience: an int - the number of epochs with no improvement
+    after which training will be stopped. Defaults to 3.
+    :returns: an `EarlyStopping` callback.
+    """
+    return keras.callbacks.EarlyStopping(
+        monitor="val_perplexity",
+        min_delta=delta,
+        patience=patience,
+        verbose=1,
+        mode="min"
+    )
+
+
 def terminate_on_nan():
     """
     :returns: a `TerminateOnNaN` callback.
