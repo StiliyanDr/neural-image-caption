@@ -238,15 +238,11 @@ def preprocess_captions(source_dir,
                         max_words=None,
                         verbose=True):
     """
-    Loads the captions and if they are:
-     - training: creates a tf.keras.preprocessing.text.Tokenizer
-       for them, builds a dictionary mapping image ids (int) to a list
-       of int sequences (the word indices) and stores the tokenizer and
-       mapping on disk so that they can be reused for training
-    - test or validation: builds a dictionary mapping image ids (int) to
-      a list of str captions (the original captions enclosed with the
-      start and end tokens) and stores the mapping on disk so that it
-      can be reused for test/validation
+    Loads the captions and builds a dictionary mapping image ids (int)
+    to a list of str captions (the original captions enclosed with the
+    start and end tokens) and stores the mapping on disk so that it can
+    be reused. If type is 'train', a tf.keras.preprocessing.text.Tokenizer
+    is built from the captions and is stored on disk.
 
     :param source_dir: a str - the directory where the mscoco dataset is
     stored.
@@ -277,13 +273,9 @@ def preprocess_captions(source_dir,
         tokenizer = _create_tokenizer_for(all_captions,
                                           meta_tokens,
                                           max_words)
-        int_captions = _vectorize_captions(str_captions,
-                                           tokenizer,
-                                           verbose)
-        _save_captions(int_captions, target_dir)
         _save_tokenizer(tokenizer, target_dir)
-    else:
-        _save_captions(str_captions, target_dir)
+
+    _save_captions(str_captions, target_dir)
 
 
 def _load_captions(data_dir, type, version, meta_tokens, verbose):
@@ -325,20 +317,6 @@ def _create_tokenizer_for(captions, meta_tokens, max_words=None):
     tokenizer.index_word[0] = meta_tokens.padding
 
     return tokenizer
-
-
-def _vectorize_captions(captions, tokenizer, verbose):
-    pairs = captions.items()
-
-    if (verbose):
-        count = len(captions)
-        print(f"Tokenizing captions for {count} images.")
-        pairs = tqdm(pairs, total=count)
-
-    return {
-        image_id: tokenizer.texts_to_sequences(caps)
-        for image_id, caps in pairs
-    }
 
 
 def _save_tokenizer(tokenizer, target_dir):
