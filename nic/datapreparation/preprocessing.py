@@ -310,6 +310,7 @@ def _create_tokenizer_for(captions, meta_tokens, max_words=None):
     assert isinstance(captions, list)
     tokenizer = tf.keras.preprocessing.text.Tokenizer(
         num_words=max_words,
+        filters=r'!"#$%&()*+.,-/:;=?@[\]^_`{|}~',
         oov_token=meta_tokens.unknown
     )
     tokenizer.fit_on_texts(captions)
