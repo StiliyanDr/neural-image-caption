@@ -5,6 +5,40 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 
+class CustomModel(keras.Model):
+    """
+    An extended model which is needed due to the format of the data;
+    the `fit` logic stays the same.
+    """
+    def train_step(self, data):
+        images, source_captions, target_captions = data
+
+        with tf.GradientTape() as tape:
+            y_pred = self([images, source_captions], training=True)
+            loss = self.compiled_loss(target_captions,
+                                      y_pred,
+                                      regularization_losses=self.losses)
+
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+        self.compiled_metrics.update_state(target_captions, y_pred)
+
+        return {m.name: m.result() for m in self.metrics}
+
+    def test_step(self, data):
+        images, source_captions, target_captions = data
+        y_pred = self([images, source_captions], training=False)
+
+        self.compiled_loss(target_captions,
+                           y_pred,
+                           regularization_losses=self.losses)
+        self.compiled_metrics.update_state(target_captions, y_pred)
+
+        return {m.name: m.result() for m in self.metrics}
+
+
 class RNNOptions(NamedTuple):
     """
     Bundles up the configuration options of an RNN module:
@@ -92,7 +126,7 @@ def define_decoder_model(features_size,
         name="word-projection"
     )(transformed_captions)
 
-    return keras.Model(inputs=[features_input, captions_input],
+    return CustomModel(inputs=[features_input, captions_input],
                        outputs=word_projection,
                        name=name)
 
@@ -152,7 +186,7 @@ def connect(decoder_model, *,
     features = encoder_model(images)
     word_projection = decoder_model([features, captions])
 
-    return keras.Model(
+    return CustomModel(
         inputs=[images, captions],
         outputs=word_projection,
         name=name
