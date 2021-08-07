@@ -16,13 +16,11 @@ class Perplexity(keras.metrics.Metric):
             name="cross-entropy",
             initializer="zeros",
             dtype=self.dtype,
-            trainable=False,
         )
         self._total_target_words = self.add_weight(
             name="total-target-words",
             initializer="zeros",
             dtype=tf.int32,
-            trainable=False,
         )
 
     def update_state(self, y_true, y_pred, sample_weight=None):
@@ -35,11 +33,13 @@ class Perplexity(keras.metrics.Metric):
         cross_entropy = create_loss_object()
         loss = cross_entropy(y_true, y_pred)
         self._cross_entropy.assign_add(
-            target_words * loss
+            tf.cast(target_words, self._cross_entropy.dtype) * loss
         )
 
     def result(self):
-        return tf.exp(self._cross_entropy / self._total_target_words)
+        total_target_words = tf.cast(self._total_target_words,
+                                     self._cross_entropy.dtype)
+        return tf.exp(self._cross_entropy / total_target_words)
 
     def reset_states(self):
         self._total_target_words.assign(0)
