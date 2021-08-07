@@ -1,2 +1,4 @@
+nltk
+numpy
 tensorflow
 tqdm
