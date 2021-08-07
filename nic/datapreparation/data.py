@@ -108,3 +108,20 @@ def vocabulary_size(path):
     """
     tokenizer = load_tokenizer(path)
     return len(tokenizer.word_index)
+
+
+def features_size(path):
+    """
+    :param path: a str - the path where preprocessed data is stored.
+    :returns: an int - the size of extracted image features.
+    """
+    features_dir = os.path.join(path, "train", "features")
+    utils.verify_dir_exists(features_dir)
+    all_features = os.listdir(features_dir)
+    assert all_features
+    features_path = os.path.join(features_dir, all_features[0])
+
+    features = utils.deserialise_from(features_path)
+    assert features.ndim == 1
+
+    return int(tf.size(features))

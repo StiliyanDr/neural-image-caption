@@ -1,4 +1,5 @@
 from nic.datapreparation.data import (
+    features_size,
     load_data,
     load_tokenizer,
     vocabulary_size,
