@@ -65,24 +65,24 @@ def preprocess_data(source_dir="mscoco",
      - preprocesses each image and pickles the `tf.Tensor` in
        'D/<train, test or val>/images/<image id>.pcl'. Similarly,
        features extracted for an image (if requested) are pickled to
-       files (named the same way) in 'D/<train or val>/features'
+       files (named the same way) in 'D/<train, test or val>/features'
      - loads the train captions, creates a
-       `tf.keras.preprocessing.text.Tokenizer` for them, builds a
-       dictionary mapping image ids (int) to a list of int sequences
-       (the word indices) and saves the tokenizer and mapping to files
-       in 'D/train' - 'captions.pcl' and 'tokenizer.json', respectively.
-       The validation and test captions are loaded into dictionaries
-       mapping image ids to lists of strs - the original captions
-       enclosed with the start and end metatokens. These dictionaries
-       are saved in 'D/<test or val>/captions.pcl'.
+       `tf.keras.preprocessing.text.Tokenizer` for them and saves it
+        to a file named 'D/train/tokenizer.json'
+     - builds a dictionary mapping image ids (int) to a list of str
+       captions (the original captions enclosed with the start and end
+       meta tokens) and stores the mapping to a file named
+       'D/<train, test or val>/captions.pcl'
 
     :param source_dir: a str - the directory storing the dataset.
+    Defaults to 'mscoco'.
     :param target_dir: a str - the directory where to store the result.
+    Defaults to 'data'.
     :param version: a str - the dataset's version. Defaults to '2017'.
     :param image_options: an instance of ImageOptions.
     :param meta_tokens: an instance of MetaTokens.
-    :param max_words: the maximum size of the captions dictionary. By
-    default it is not limited.
+    :param max_words: the maximum vocabulary size. By default it is not
+    limited.
     :param verbose: a boolean value indicating whether to show a status
     bar for the progress. Defaults to `True`.
     :raises FileNotFoundError: if the source directory does not exist.
@@ -96,7 +96,7 @@ def preprocess_data(source_dir="mscoco",
         target_subdir = target_subdirs[data_type]
         preprocess_images(source_images_dir,
                           target_subdir,
-                          _options_for(data_type, image_options),
+                          image_options,
                           verbose)
         preprocess_captions(source_dir,
                             target_subdir,
@@ -115,14 +115,6 @@ def _create_target_structure(target_dir):
     utils.make_dirs([train_dir, validation_dir, test_dir])
 
     return {"train": train_dir, "val": validation_dir, "test": test_dir}
-
-
-def _options_for(data_type, image_options):
-    return (image_options
-            if (data_type != "test")
-            else image_options._replace(
-                feature_extractor=None
-            ))
 
 
 def preprocess_images(source_dir,
@@ -255,8 +247,8 @@ def preprocess_captions(source_dir,
     :param type: str - the type of captions to be loaded; 'val', 'test'
     or 'train'. Defaults to 'train'.
     :param version: a str - the captions' version. Defaults to '2017'.
-    :param max_words: the maximum size of the captions dictionary. By
-    default it is not limited.
+    :param max_words: the maximum vocabulary size. By default it is not
+    limited.
     :param verbose: a boolean value indicating whether to show a status
     bar for the progress. Defaults to `True`.
     """
