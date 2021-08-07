@@ -9,13 +9,13 @@ from nic import (
 from nic.datapreparation.data import load_data
 
 
-def compile_decoder(model,
-                    learning_rate=0.0001):
+def compile_model(model,
+                  learning_rate=0.0001):
     """
-    Compiles and returns the decoder module of the NIC model. This is
-    useful when training the decoder with the encoder still frozen.
+    Compiles and returns a model.
 
-    :param model: a model created with `define_decoder_model`.
+    :param model: a model created with `define_decoder_model`,
+    `define_model` or `connect`.
     :param learning_rate: a float - the learning rate.
     :returns: the compiled model. Its optimizer is `Adam`, its loss is
     sparse categorical cross entropy, and its only additional metric is
@@ -32,33 +32,37 @@ def compile_decoder(model,
     return model
 
 
-def train_decoder(*,
-                  model,
-                  path_to_data,
-                  batch_size=32,
-                  buffer_size=1024,
-                  tensor_board_dir,
-                  tensor_board_update_freq="epoch",
-                  checkpoint_dir,
-                  checkpoint_freq="epoch",
-                  learning_rate_decay=0.9,
-                  decay_patience=3,
-                  perplexity_delta=0.001,
-                  min_learning_rate=0.,
-                  early_stop_patience=3,
-                  max_epochs=10,
-                  shuffle_for_each_epoch=False):
+def train_model(*,
+                model,
+                path_to_data,
+                is_decoder_only,
+                batch_size=32,
+                buffer_size=1024,
+                tensor_board_dir,
+                tensor_board_update_freq="epoch",
+                checkpoint_dir,
+                checkpoint_freq="epoch",
+                learning_rate_decay=0.9,
+                decay_patience=3,
+                perplexity_delta=0.001,
+                min_learning_rate=0.,
+                early_stop_patience=3,
+                max_epochs=10,
+                shuffle_for_each_epoch=False):
     """
     :param model: a compiled model. If a fresh training process is
-    started, this should be the result of `compile_decoder`. For extra
+    started, this should be the result of `compile_model`. For extra
     training, this should be the result of `restore_model`.
     :param path_to_data: a str - the path of the directory where the
     preprocessed data is stored.
+    :param is_decoder_only: a boolean value indicating whether only
+    the decoder part of the model is being trained. This determines
+    things like what kind of data to load - features or images.
     :param batch_size: an int - the batch size. Defaults to 32.
     :param buffer_size: an int - the size for the buffer used to shuffle
-    the train data.
+    the train data before training is started. Defaults to 1024.
     :param tensor_board_dir: a str - the path of the directory where to
-    log data for TensorBoard; it should be exclusively for that.
+    log data for TensorBoard; it should be used exclusively for that.
     :param tensor_board_update_freq: 'batch' or 'epoch' or integer. When
     using 'batch', the losses and metrics are written to TensorBoard
     after each batch. The same applies for 'epoch'. If using an integer,
@@ -82,7 +86,7 @@ def train_decoder(*,
     :param min_learning_rate: a float - the min learning rate. Defaults
     to 0.
     :param early_stop_patience: an int - the number of learning rate
-    decays to wait until terminating the training process. Defaultst to
+    decays to wait until terminating the training process. Defaults to
     3 which means that if the learning rate is decayed 3 times in a row
     (as validation perplexity does not improve), the process will be
     terminated.
@@ -93,9 +97,12 @@ def train_decoder(*,
     :returns: a pair of the training history (as returned by Model.fit)
     and a dict mapping metric names to the corresponding test values.
     """
-    train_data, val_data, test_data = _load_all_data(path_to_data,
-                                                     batch_size,
-                                                     buffer_size)
+    train_data, val_data, test_data = _load_all_data(
+        path_to_data,
+        batch_size,
+        buffer_size,
+        load_as_features=is_decoder_only
+    )
     callbacks = _create_callbacks(
         tensor_board_dir,
         tensor_board_update_freq,
@@ -122,21 +129,24 @@ def train_decoder(*,
     return (history, dict(zip(model.metrics_names, results)))
 
 
-def _load_all_data(path_to_data, batch_size, buffer_size):
+def _load_all_data(path_to_data,
+                   batch_size,
+                   buffer_size,
+                   load_as_features):
     train = load_data(
         path_to_data,
         type="train",
-        load_as_features=True
+        load_as_features=load_as_features
     ).shuffle(buffer_size).batch(batch_size)
     val = load_data(
         path_to_data,
         type="val",
-        load_as_features=True
+        load_as_features=load_as_features
     ).batch(batch_size)
     test = load_data(
         path_to_data,
         type="test",
-        load_as_features=True
+        load_as_features=load_as_features
     ).batch(batch_size)
 
     return (train, val, test)
