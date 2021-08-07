@@ -6,16 +6,16 @@ import tensorflow as tf
 from nic.datapreparation import utils
 
 
-def load_data(path, type, load_as_features=False):
+def load_data(path, type, load_as_features=True):
     """
     :param path: a str - the path of the directory storing the
     preprocessed data.
     :param type: a str - the type of data to load. Possible values:
     'train', 'test' and 'val'.
     :param load_as_features: a boolean value indicating whether to
-    load the image features. If `False`, the actual images are loaded;
-    this should be used only for fine tuning and testing. Defaults to
-    `False` and is ignored for `type='test'`.
+    load the image features. If `False`, the actual images (preprocessed
+    for the chosen CNN) are loaded; this should be used only for fine
+    tuning and testing. Defaults to `True`.
     :returns: a tf.data.Dataset which yields 3-tuples whose components
      are :
       - image tensors (feature vectors if `load_as_features` is set to
@@ -31,7 +31,7 @@ def load_data(path, type, load_as_features=False):
     )
     images_dir = os.path.join(data_subdir,
                               ("features"
-                               if (load_as_features and type != "test")
+                               if (load_as_features)
                                else "images"))
     image_paths, all_captions = _vectorise(captions, images_dir, path)
     image_dataset = tf.data.Dataset.from_tensor_slices(
