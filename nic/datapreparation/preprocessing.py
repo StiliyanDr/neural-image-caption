@@ -326,19 +326,18 @@ def _save_captions(caps, target_dir):
         pickle.dump(caps, file)
 
 
-def prepare_image(path, model_name, target_size):
+def prepare_image(path, model, target_size):
     """
     Prepares an image to be fed into a specific CNN.
 
     :param path: a str - the path of the (JPEG or JPG) image.
-    :param model_name: a str - the name of the model to preprocess the
-    images for. This model is looked up in `tf.keras.applications`
-    and its `preprocess_input` method is called on the image.
+    :param model: the model to preprocess the images for. This model
+    must come from `tf.keras.applications` and its `preprocess_input`
+    method is called on the image.
     :param target_size: a 2-tuple of integers - the spatial size of the
     image, as expected by the chosen model.
     :returns: a tf.Tensor representing the prepared image.
     """
-    model = getattr(tf.keras.applications, model_name)
     image = tf.io.read_file(path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.image.resize(image, target_size)
