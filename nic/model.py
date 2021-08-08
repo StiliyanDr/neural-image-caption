@@ -109,7 +109,7 @@ def define_decoder_model(features_size,
         go_backwards=rnn_options.reverse_sequence,
         return_sequences=True,
         return_state=True,
-        name="decoder"
+        name="rnn-decoder"
     )(embedded_captions, initial_state=[transformed_features, c_state])
 
     # (batch_size, max_seq_len, hidden_size)
