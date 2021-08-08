@@ -130,7 +130,7 @@ class CaptionGenerator:
         return image
 
     def __caption_image(self, image, limit):
-        h_state = self.__encoder(image)
+        h_state = self.__encoder(tf.expand_dims(image, axis=0))
         c_state = tf.zeros_like(h_state)
         translation = []
         word = self.__meta_tokens.start
@@ -155,11 +155,11 @@ class CaptionGenerator:
                              h_state,
                              c_state):
         index = self.__tokenizer.word_index[word]
-        return self.__decoder(
+        return self.__decoder([
             tf.constant([[index]]),
             h_state,
-            c_state
-        )
+            c_state,
+        ])
 
     def __most_probable_word(self, probabilities):
         samples = tf.random.categorical(probabilities, num_samples=1)
