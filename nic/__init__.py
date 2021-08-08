@@ -11,3 +11,9 @@ from nic.training import (
     restore_model,
     train_model,
 )
+from nic.captioning import (
+    CaptionGenerator,
+    generate_captions,
+    generate_captions_from_paths,
+    generate_captions_from_tensors,
+)

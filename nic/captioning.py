@@ -166,3 +166,73 @@ class CaptionGenerator:
         index = samples[0][0].numpy()
 
         return self.__tokenizer.index_word[index]
+
+
+def generate_captions(images, generator, limit=None):
+    """
+    A convenience function which takes an iterable of images and a
+    CaptionGenerator and invokes the generator on each image, producing
+    a Python generator of captions.
+
+    :param images: an iterable of strs (image paths) or of tf.Tensors
+    (prepared images).
+    :param generator: an instance of CaptionGenerator. Note that it must
+    support image loading if `images` is an iterable of paths.
+    :param limit: an unsigned int - a limit for a caption's length in
+    tokens. If omitted or `None`, defaults to `CAPTION_LIMIT`.
+    :returns: a generator which invokes `generator` on each of the
+    images.
+    """
+    return (generator(i, limit) for i in images)
+
+
+def generate_captions_from_tensors(
+    images,
+    model,
+    encoder_name,
+    decoder_name,
+    meta_tokens,
+    tokenizer,
+    caption_limit=None,
+):
+    """
+    A convenience function which creates a CaptionGenerator and invokes
+    it on each image in an iterable of tf.Tensors. See CaptionGenerator
+    and `generate_captions`.
+    """
+    generator = CaptionGenerator(
+        model,
+        encoder_name,
+        decoder_name,
+        meta_tokens,
+        tokenizer
+    )
+
+    return generate_captions(images, generator, caption_limit)
+
+
+def generate_captions_from_paths(image_paths,
+                                 model,
+                                 encoder_name,
+                                 decoder_name,
+                                 meta_tokens,
+                                 tokenizer,
+                                 image_options,
+                                 caption_limit=None):
+    """
+    A convenience function which creates a CaptionGenerator and invokes
+    it on each image in an iterable of image paths. See CaptionGenerator
+    and `generate_captions`.
+
+    Note that the supported image formats are JPEG, PNG, GIF, BMP.
+    """
+    generator = CaptionGenerator(
+        model,
+        encoder_name,
+        decoder_name,
+        meta_tokens,
+        tokenizer,
+        image_options
+    )
+
+    return generate_captions(image_paths, generator, caption_limit)
