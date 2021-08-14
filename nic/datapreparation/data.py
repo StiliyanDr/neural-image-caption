@@ -121,10 +121,11 @@ def load_images(path, type, load_as_features=False):
     :param load_as_features: a boolean value indicating whether to
     load image features or just the preprocessed images. Defaults to
     `False`.
-    :returns: a tf.data.Dataset which yields pairs of:
+    :returns: a pair of a tf.data.Dataset which yields pairs of:
       - image tensors (feature vectors if `load_as_features` is set to
         `True`)
       - integers - the corresponding image ids
+    and an int - the number of images in the Dataset.
     """
     data_subdir = os.path.join(path, type)
     images_dir = os.path.join(data_subdir,
@@ -137,7 +138,7 @@ def load_images(path, type, load_as_features=False):
         np.array(image_paths)
     )
 
-    return image_dataset.map(
+    image_dataset = image_dataset.map(
         lambda path:
         tf.numpy_function(
             _do_load_image,
@@ -146,6 +147,8 @@ def load_images(path, type, load_as_features=False):
         ),
         num_parallel_calls=tf.data.AUTOTUNE
     )
+
+    return (image_dataset, len(image_paths))
 
 
 def _do_load_image(path):
