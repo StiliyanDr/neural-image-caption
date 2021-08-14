@@ -100,6 +100,62 @@ def load_tokenizer(path):
     )
 
 
+def load_captions(path, type):
+    """
+    :param path: a str - the path where preprocessed data is stored.
+    :param type: a str - the type of captions to load. Possible values:
+    'train', 'test' and 'val'.
+    :returns: a dictionary mapping image ids (int) to lists of captions
+    (strs) which are surrounded by the start and end meta tokens.
+    """
+    return utils.deserialise_from(
+        os.path.join(path, type, "captions.pcl")
+    )
+
+
+def load_images(path, type, load_as_features=False):
+    """
+    :param path: a str - the path where preprocessed data is stored.
+    :param type: a str - the type of images to load. Possible values:
+    'train', 'test' and 'val'.
+    :param load_as_features: a boolean value indicating whether to
+    load image features or just the preprocessed images. Defaults to
+    `False`.
+    :returns: a tf.data.Dataset which yields pairs of:
+      - image tensors (feature vectors if `load_as_features` is set to
+        `True`)
+      - integers - the corresponding image ids
+    """
+    data_subdir = os.path.join(path, type)
+    images_dir = os.path.join(data_subdir,
+                              ("features"
+                               if (load_as_features)
+                               else "images"))
+    image_paths = [os.path.join(images_dir, name)
+                   for name in os.listdir(images_dir)]
+    image_dataset = tf.data.Dataset.from_tensor_slices(
+        np.array(image_paths)
+    )
+
+    return image_dataset.map(
+        lambda path:
+        tf.numpy_function(
+            _do_load_image,
+            [path],
+            [tf.float32, tf.int32]
+        ),
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
+
+
+def _do_load_image(path):
+    path = path.decode()
+    image = utils.deserialise_from(path).numpy()
+    image_id = utils.image_name_to_id(utils.short_name_for(path))
+
+    return (image, np.array(image_id))
+
+
 def vocabulary_size(path):
     """
     :param path: a str - the path where preprocessed data is stored.
