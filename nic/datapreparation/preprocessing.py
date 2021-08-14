@@ -17,11 +17,11 @@ class ImageOptions(NamedTuple):
     Specifies image preprocessing options:
      - model_name: a str - the name of the model to preprocess the
        images for. This model is looked up in `tf.keras.applications`
-       and its `preprocess_input` method is called on each image
+       and its `preprocess_input` method is called on batches of images
      - target_size: a 2-tuple of integers - the spatial size of the
        image, as expected by the chosen model
      - feature_extractor: a callable taking and returning a `tf.Tensor`.
-       If provided, this function will extract features for a batch of
+       If provided, this function will extract features for batches of
        preprocessed images. This is useful when doing transfer
        learning and the feature extracting module of the model is frozen.
        Extracting the features once and reusing them to train the layers
