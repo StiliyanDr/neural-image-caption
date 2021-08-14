@@ -46,5 +46,5 @@ class Perplexity(keras.metrics.Metric):
         self._cross_entropy.assign(0.0)
 
 
-def bleu_score_of(translated_sentences, reference_sentences):
-    return 100 * corpus_bleu(reference_sentences, translated_sentences)
+def bleu_score_of(predicted_sentences, reference_sentences):
+    return 100 * corpus_bleu(reference_sentences, predicted_sentences)
