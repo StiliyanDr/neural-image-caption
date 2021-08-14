@@ -7,6 +7,7 @@ A simple Python API built on top of [TensorFlow](https://www.tensorflow.org/) fo
  * [Description](#description)
  * [Installation](#installation)
  * [MSCOCO API](#mscoco-api)
+ * [NIC Model](#nic-model)
 
 <a name="description"></a>
 
@@ -157,6 +158,18 @@ There are a few more API functions that work with preprocessed data. The [tokeni
 tokenizer = nic.dp.load_tokenizer(data_dir)
 ```
 
+Captions can be loaded into a dictionary mapping integers (image ids) to lists of strings (the original captions enclosed with the start and end meta tokens):  
+
+```python
+val_captions = nic.dp.load_captions(data_dir, type="val")
+```
+
+Images (preprocessed for the chosen CNN encoder) or their corresponding features can be loaded into a `tf.data.Dataset` which yields pairs of the images/features and the image id:  
+
+```python
+test_images, count = nic.dp.load_images(data_dir, type="test", load_as_features=False)
+```
+
 Vocabulary and features sizes can also be obtained:  
 
 ```python
@@ -164,3 +177,6 @@ vocabulary_size = nic.dp.vocabulary_size(data_dir)
 features_size = nic.dp.features_size(data_dir)
 ```
 
+<a name="nic-model"></a>
+
+## NIC Model
