@@ -17,3 +17,4 @@ from nic.captioning import (
     generate_captions_from_paths,
     generate_captions_from_tensors,
 )
+from nic.evaluation import bleu_score_of
