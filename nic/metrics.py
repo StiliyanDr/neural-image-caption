@@ -41,7 +41,7 @@ class Perplexity(keras.metrics.Metric):
                                      self._cross_entropy.dtype)
         return tf.exp(self._cross_entropy / total_target_words)
 
-    def reset_states(self):
+    def reset_state(self):
         self._total_target_words.assign(0)
         self._cross_entropy.assign(0.0)
 
