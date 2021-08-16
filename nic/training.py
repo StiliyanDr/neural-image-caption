@@ -7,6 +7,7 @@ from nic import (
     metrics as mcs,
 )
 from nic.datapreparation.data import load_data
+from nic.model import CustomModel
 
 
 def compile_model(model,
@@ -207,7 +208,13 @@ def restore_model(checkpoint_dir, restore_best=False):
 
     if (checkpoints):
         path = optimal(checkpoints, key=key)
-        return keras.models.load_model(path)
+        return keras.models.load_model(
+            path,
+            custom_objects={
+                "CustomModel": CustomModel,
+                "Perplexity": mcs.Perplexity,
+            }
+        )
     else:
         raise RuntimeError("No checkpoints available!")
 

@@ -1,4 +1,5 @@
 from nltk.translate.bleu_score import corpus_bleu
+import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
@@ -24,9 +25,11 @@ class Perplexity(keras.metrics.Metric):
         )
 
         if (weights is not None):
+            h = weights["cross_entropy"]
+            ttw = weights["total_target_words"]
             self.set_weights([
-                weights["cross_entropy"],
-                weights["total_target_words"]
+                np.array(h) if (isinstance(h, float)) else h,
+                np.array(ttw) if (isinstance(ttw, int)) else ttw,
             ])
 
     def update_state(self, y_true, y_pred, sample_weight=None):
@@ -52,8 +55,8 @@ class Perplexity(keras.metrics.Metric):
         self._cross_entropy.assign(0.0)
 
     def get_config(self):
-        return {"cross_entropy": self._cross_entropy.numpy(),
-                "total_target_words": self._total_target_words.numpy()}
+        return {"cross_entropy": np.array(self._cross_entropy),
+                "total_target_words": np.array(self._total_target_words)}
 
     @classmethod
     def from_config(cls, config):
