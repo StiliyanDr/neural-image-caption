@@ -50,7 +50,7 @@ def checkpoint(path_pattern=CHECKPOINT_PATTERN,
         monitor="val_perplexity",
         save_best_only=True,
         mode="min",
-        save_weights_only=True,
+        save_weights_only=False,
         save_freq=frequency,
         verbose=1,
     )
