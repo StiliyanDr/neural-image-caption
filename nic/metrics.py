@@ -10,7 +10,7 @@ def create_loss_object():
 
 
 class Perplexity(keras.metrics.Metric):
-    def __init__(self, name="perplexity", **kwargs):
+    def __init__(self, name="perplexity", weights=None, **kwargs):
         super().__init__(name=name, **kwargs)
         self._cross_entropy = self.add_weight(
             name="cross-entropy",
@@ -22,6 +22,12 @@ class Perplexity(keras.metrics.Metric):
             initializer="zeros",
             dtype=tf.int32,
         )
+
+        if (weights is not None):
+            self.set_weights([
+                weights["cross_entropy"],
+                weights["total_target_words"]
+            ])
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         target_words = tf.math.count_nonzero(
@@ -44,6 +50,14 @@ class Perplexity(keras.metrics.Metric):
     def reset_state(self):
         self._total_target_words.assign(0)
         self._cross_entropy.assign(0.0)
+
+    def get_config(self):
+        return {"cross_entropy": self._cross_entropy.numpy(),
+                "total_target_words": self._total_target_words.numpy()}
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(weights=config)
 
 
 def bleu_score_of(predicted_sentences, reference_sentences):
