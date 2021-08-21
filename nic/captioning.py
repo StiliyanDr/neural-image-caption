@@ -9,60 +9,75 @@ _CAPTION_LIMIT = 100
 class CaptionGenerator:
     """
     Generates captions given images.
+
+    A generator can be created from a NIC model or the decoder module
+    only. In the latter case, the generator can only be used with image
+    features.
     """
     def __init__(self,
                  model,
-                 encoder_name,
-                 decoder_name,
                  meta_tokens,
                  tokenizer,
+                 is_decoder_only=True,
                  image_options=None):
         """
         :param model: an instance of the NIC model created with
-        `define_model` or `connect`.
-        :param encoder_name: a str - the name of the CNN encoder module
-        of the model.
-        :param decoder_name: a str - the name of the decoder module
-        of the model.
+        `define_decoder_model`, `define_model` or `connect`.
         :param meta_tokens: an instance of MetaTokens - the meta tokens
         with which the data was preprocessed.
         :param tokenizer: the tokenizer built from the data, see
         `load_tokenizer`.
+        :param is_decoder_only: a boolean value indicating whether
+        `model` was defined with `define_decoder_model`. Defaults to
+        True.
         :param image_options: an instance of ImageOptions or None. When
         an instance of ImageOptions, it should be the instance used when
         preprocessing the data; in this case the object supports loading
         and preparing images when given paths. When None, the object
         must only be given tf.Tensors which represent already prepared
-        images.
+        images. Note that this is ignored if `is_decoder_only` is True.
         """
         hidden_state_output = self.__set_up_encoder(model,
-                                                    encoder_name,
-                                                    decoder_name)
-        self.__set_up_decoder(model, decoder_name, hidden_state_output)
+                                                    is_decoder_only)
+        self.__set_up_decoder(model,
+                              hidden_state_output,
+                              is_decoder_only)
         self.__meta_tokens = meta_tokens
         self.__tokenizer = tokenizer
         self.__image_encoder, self.__target_size = (
             (getattr(tf.keras.applications, image_options.model_name),
              image_options.target_size)
-            if (image_options is not None)
+            if (image_options is not None and not is_decoder_only)
             else (None, None)
         )
 
-    def __set_up_encoder(self, model, encoder_name, decoder_name):
+    def __set_up_encoder(self, model, is_decoder_only):
         image_input = model.inputs[0]
-        encoder = model.get_layer(encoder_name)
-        decoder = model.get_layer(decoder_name)
-        features_transformation = decoder.get_layer(
-            "features-transformation"
-        )
-        features = encoder(image_input)
-        hidden_state = features_transformation(features)
+
+        if (is_decoder_only):
+            features_transformation = model.get_layer(
+                "features-transformation"
+            )
+            hidden_state = features_transformation(image_input)
+        else:
+            encoder = model.layers[1]
+            decoder = model.layers[-1]
+            features_transformation = decoder.get_layer(
+                "features-transformation"
+            )
+            features = encoder(image_input)
+            hidden_state = features_transformation(features)
+
         self.__encoder = tf.keras.Model(inputs=image_input,
                                         outputs=hidden_state)
+
         return hidden_state
 
-    def __set_up_decoder(self, model, decoder_name, hidden_state):
-        captions_input = model.inputs[1]
+    def __set_up_decoder(self, model, hidden_state, is_decoder_only):
+        decoder = (model
+                   if (is_decoder_only)
+                   else model.layers[-1])
+        captions_input = decoder.inputs[1]
         hidden_state_input = tf.keras.Input(
             shape=hidden_state.shape[-1],
             dtype=hidden_state.dtype
@@ -71,7 +86,6 @@ class CaptionGenerator:
             shape=hidden_state.shape[-1],
             dtype=hidden_state.dtype
         )
-        decoder = model.get_layer(decoder_name)
         embedding = decoder.get_layer("word-embedding")
         rnn = decoder.get_layer("rnn-decoder")
         transformation = decoder.get_layer(
@@ -101,18 +115,25 @@ class CaptionGenerator:
 
     def __call__(self, image, limit=None):
         """
-        :param image: a str or a tf.Tensor. If a tensor, it is assumed
-        to be prepared for the model. If a str, the image is loaded and
-        prepared before a caption is generated for it.
+        :param image: a str or a tf.Tensor. If a str, the image is
+        loaded and prepared (for the CNN encoder) as a tensor. Otherwise
+        it is already a tensor. The tensor must be preprocessed for the
+        CNN encoder or be the features extracted from an encoder, if the
+        generator was created from the decoder module.
         :param limit: an unsigned int - a limit for the caption's
         length in tokens. If omitted or `None`, defaults to
         `CAPTION_LIMIT`.
         :returns: a list of tokens - the caption.
-        :raises RuntimeError: if `image` is str and the object does not
-        support image loading.
+        :raises RuntimeError: if:
+         - `image` is str and the object does not support image loading
+         - `image` is a tensor (or loaded into a tensor) which does not
+           have the expected shape
         """
+        image = self.__prepare_if_path(image)
+        self.__validate_shape_of(image)
+
         return self.__caption_image(
-            self.__prepare_if_path(image),
+            image,
             (limit
              if (limit is not None)
              else _CAPTION_LIMIT)
@@ -128,6 +149,15 @@ class CaptionGenerator:
                 raise RuntimeError("Can't handle paths!")
 
         return image
+
+    def __validate_shape_of(self, image):
+        target_shape = self.__encoder.inputs[0].shape[1:]
+
+        if (image.shape != target_shape):
+            raise RuntimeError(
+                f"Image shape {tuple(image.shape)} does not "
+                f"match expected shape {tuple(target_shape)}!"
+            )
 
     def __caption_image(self, image, limit):
         h_state = self.__encoder(tf.expand_dims(image, axis=0))
@@ -175,7 +205,7 @@ def generate_captions(images, generator, limit=None):
     a Python generator of captions.
 
     :param images: an iterable of strs (image paths) or of tf.Tensors
-    (prepared images).
+    (prepared images or image features).
     :param generator: an instance of CaptionGenerator. Note that it must
     support image loading if `images` is an iterable of paths.
     :param limit: an unsigned int - a limit for a caption's length in
@@ -189,10 +219,9 @@ def generate_captions(images, generator, limit=None):
 def generate_captions_from_tensors(
     images,
     model,
-    encoder_name,
-    decoder_name,
     meta_tokens,
     tokenizer,
+    is_decoder_only=True,
     caption_limit=None,
 ):
     """
@@ -202,10 +231,9 @@ def generate_captions_from_tensors(
     """
     generator = CaptionGenerator(
         model,
-        encoder_name,
-        decoder_name,
         meta_tokens,
-        tokenizer
+        tokenizer,
+        is_decoder_only
     )
 
     return generate_captions(images, generator, caption_limit)
@@ -213,8 +241,6 @@ def generate_captions_from_tensors(
 
 def generate_captions_from_paths(image_paths,
                                  model,
-                                 encoder_name,
-                                 decoder_name,
                                  meta_tokens,
                                  tokenizer,
                                  image_options,
@@ -224,15 +250,16 @@ def generate_captions_from_paths(image_paths,
     it on each image in an iterable of image paths. See CaptionGenerator
     and `generate_captions`.
 
-    Note that the supported image formats are JPEG, PNG, GIF, BMP.
+    Note that:
+     - `model` must be the entire model, including the encoder module
+     - the supported image formats are JPEG, PNG, GIF, BMP.
     """
     generator = CaptionGenerator(
         model,
-        encoder_name,
-        decoder_name,
         meta_tokens,
         tokenizer,
-        image_options
+        is_decoder_only=False,
+        image_options=image_options
     )
 
     return generate_captions(image_paths, generator, caption_limit)

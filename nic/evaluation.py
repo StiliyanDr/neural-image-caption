@@ -9,26 +9,24 @@ from nic import (
 
 def bleu_score_of(model,
                   *,
+                  is_decoder_only=True,
                   path_to_data,
                   data_type="test",
                   meta_tokens=dp.MetaTokens(),
-                  encoder_name,
-                  decoder_name,
                   caption_limit=None,
                   verbose=True):
     """
     :param model: an instance of the NIC model created with
-    `define_model` or `connect`.
+    `define_decoder_model`, `define_model` or `connect`.
+    :param is_decoder_only: a boolean value indicating whether
+    `model` was defined with `define_decoder_model`. Defaults to
+    True.
     :param path_to_data: a str - the path of the directory where
     preprocessed data is stored.
     :param data_type: a str - the type of data on which to evaluate the
     model. Should be 'test' (the default), 'val' or 'train'.
-    :param meta_tokens: an instance of MetaTokens, the meta tokens used
-    when preprocessing data.
-    :param encoder_name: a str - the name of the CNN encoder module
-    of the model.
-    :param decoder_name: a str - the name of the decoder module
-    of the model.
+    :param meta_tokens: an instance of MetaTokens - the meta tokens
+    with which the data was preprocessed.
     :param caption_limit: an unsigned int - a limit for the predicted
     captions' length in tokens. If omitted or `None`, defaults to
     `CAPTION_LIMIT`.
@@ -38,15 +36,16 @@ def bleu_score_of(model,
     :returns: a float in the range [0, 100] - the BLEU-4 score of the
     model.
     """
-    images, images_count = dp.load_images(path_to_data, data_type)
+    images, images_count = dp.load_images(path_to_data,
+                                          data_type,
+                                          is_decoder_only)
     captions = dp.load_captions(path_to_data, data_type)
     tokenizer = dp.load_tokenizer(path_to_data)
     generator = cptn.CaptionGenerator(
         model,
-        encoder_name,
-        decoder_name,
         meta_tokens,
-        tokenizer
+        tokenizer,
+        is_decoder_only
     )
     reference, predicted = [], []
 
