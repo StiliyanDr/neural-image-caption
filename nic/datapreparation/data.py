@@ -156,7 +156,7 @@ def _do_load_image(path):
     image = utils.deserialise_from(path).numpy()
     image_id = utils.image_name_to_id(utils.short_name_for(path))
 
-    return (image, np.array(image_id))
+    return (image, np.array(image_id, dtype=np.int32))
 
 
 def vocabulary_size(path):
