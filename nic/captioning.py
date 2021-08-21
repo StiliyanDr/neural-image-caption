@@ -58,8 +58,14 @@ class _Captions:
         :returns: a list of lists of strs - the captions without any
         meta tokens.
         """
-        assert self.all_finished
-        captions = [c[1:-1] for c in self.__captions]
+        end = self.__meta_tokens
+
+        captions = [
+            (c[1:-1]
+             if (c[-1] == end)
+             else c[1:])
+            for c in self.__captions
+        ]
         self.__set_initial_captions()
 
         return captions
