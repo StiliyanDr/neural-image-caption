@@ -6,6 +6,69 @@ from nic.datapreparation.preprocessing import prepare_image
 _CAPTION_LIMIT = 100
 
 
+class _Captions:
+    """
+    Non-public class.
+
+    Represents the state of a batch of captions during their generation.
+    """
+    def __init__(self, meta_tokens, batch_size):
+        """
+        :param meta_tokens: an instance of MetaTokens.
+        :param batch_size: an int.
+        """
+        self.__meta_tokens = meta_tokens
+        self.__set_initial_captions(meta_tokens.start, batch_size)
+
+    def __set_initial_captions(self, start_token=None, batch_size=None):
+        if (start_token is None):
+            start_token = self.__meta_tokens.start
+            batch_size = len(self.__captions)
+
+        self.__captions = [[start_token] for _ in batch_size]
+        self.__max_length = 0
+
+    @property
+    def current_words(self):
+        """
+        :returns: a list of strs.
+        """
+        return [c[-1] for c in self.__captions]
+
+    def extend(self, new_words):
+        """
+        :param new_words: a list of strs.
+        """
+        end = self.__meta_tokens.end
+
+        for cap, word in zip(self.__captions, new_words):
+            if (cap[-1] != end):
+                cap.append(word)
+
+        self.__max_length += int(any(w != end for w in new_words))
+
+    @property
+    def all_finished(self):
+        end = self.__meta_tokens.end
+
+        return all(c[-1] == end for c in self.__captions)
+
+    def extract(self):
+        """
+        :returns: a list of lists of strs - the captions without any
+        meta tokens.
+        """
+        assert self.all_finished
+        captions = [c[1:-1] for c in self.__captions]
+        self.__set_initial_captions()
+
+        return captions
+
+    @property
+    def max_length(self):
+        return self.__max_length
+
+
 class CaptionGenerator:
     """
     Generates captions given images.
