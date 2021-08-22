@@ -149,8 +149,8 @@ def preprocess_images(source_dir,
     model = getattr(tf.keras.applications, options.model_name)
 
     if (verbose):
-        batches_count = _batches_count_for(images_count,
-                                           options.batch_size)
+        batches_count = utils.batches_count_for(images_count,
+                                                options.batch_size)
         print(f"Preprocessing {images_count} images in '{source_dir}' "
               f"with a batch size of {options.batch_size}.")
         images = tqdm(images, total=batches_count)
@@ -184,11 +184,6 @@ def _images_in(directory, options):
     ).batch(options.batch_size)
 
     return (image_dataset, len(image_paths))
-
-
-def _batches_count_for(total_items, batch_size):
-    quotient, remainder = divmod(total_items, batch_size)
-    return quotient + int(remainder != 0)
 
 
 def _serialise_batch(images_batch,

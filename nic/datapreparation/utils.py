@@ -61,3 +61,8 @@ def image_name_to_id(name):
 def short_name_for(path):
     start = path.rfind(os.sep)
     return path[start + 1:]
+
+
+def batches_count_for(total_items, batch_size):
+    quotient, remainder = divmod(total_items, batch_size)
+    return quotient + int(remainder != 0)
