@@ -5,12 +5,14 @@ from nic import (
     datapreparation as dp,
     metrics as mcs,
 )
+from nic.datapreparation import utils
 
 
 def bleu_score_of(model,
                   *,
                   is_decoder_only=True,
                   path_to_data,
+                  batch_size=32,
                   data_type="test",
                   meta_tokens=dp.MetaTokens(),
                   caption_limit=None,
@@ -23,6 +25,8 @@ def bleu_score_of(model,
     True.
     :param path_to_data: a str - the path of the directory where
     preprocessed data is stored.
+    :param batch_size: an int - the batch size to use when processing
+    images. Defaults to 32.
     :param data_type: a str - the type of data on which to evaluate the
     model. Should be 'test' (the default), 'val' or 'train'.
     :param meta_tokens: an instance of MetaTokens - the meta tokens
@@ -39,6 +43,7 @@ def bleu_score_of(model,
     images, images_count = dp.load_images(path_to_data,
                                           data_type,
                                           is_decoder_only)
+    images = images.batch(batch_size)
     captions = dp.load_captions(path_to_data, data_type)
     tokenizer = dp.load_tokenizer(path_to_data)
     generator = cptn.CaptionGenerator(
@@ -52,15 +57,17 @@ def bleu_score_of(model,
     if (verbose):
         print("Computing BLEU-4 score of", model.name, "on",
               images_count, data_type, "images.")
-        images = tqdm(images)
+        batches_count = utils.batches_count_for(images_count,
+                                                batch_size)
+        images = tqdm(images, total=batches_count)
 
-    for image, id in images:
-        reference.append([
+    for ims, ids in images:
+        reference.extend([
             c.split()[1:-1]
-            for c in captions[int(id)]
-        ])
-        predicted.append(
-            generator(image, caption_limit)
+            for c in captions[int(i)]
+        ]
+            for i in ids
         )
+        predicted.extend(generator(ims, caption_limit))
 
     return mcs.bleu_score_of(predicted, reference)

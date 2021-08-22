@@ -1,5 +1,8 @@
+import itertools
+
 import tensorflow as tf
 
+from nic import datapreparation as dp
 from nic.datapreparation.preprocessing import prepare_image
 
 
@@ -77,7 +80,7 @@ class _Captions:
 
 class CaptionGenerator:
     """
-    Generates captions given images.
+    Generates captions for batches of images.
 
     A generator can be created from a NIC model or the decoder module
     only. In the latter case, the generator can only be used with image
@@ -182,107 +185,116 @@ class CaptionGenerator:
         """
         return self.__image_encoder is not None
 
-    def __call__(self, image, limit=None):
+    def __call__(self, images, limit=None):
         """
-        :param image: a str or a tf.Tensor. If a str, the image is
-        loaded and prepared (for the CNN encoder) as a tensor. Otherwise
-        it is already a tensor. The tensor must be preprocessed for the
-        CNN encoder or be the features extracted from an encoder, if the
+        :param images: a tf.Tensor. If `images.dtype` is `tf.string`,
+        the tensor is assumed to contain image paths and the images are
+        loaded and prepared (for the CNN encoder) as tensors. Otherwise
+        the `images` tensor is assumed to already have a shape of
+        (batch_size, *image_shape). image_shape is either the image
+        shape expected by the CNN encoder or the shape of the features
+        extracted by it. That is, image tensors must be preprocessed for
+        the CNN encoder or be the features extracted by it, if the
         generator was created from the decoder module.
-        :param limit: an unsigned int - a limit for the caption's
+        :param limit: an unsigned int - a limit for the captions'
         length in tokens. If omitted or `None`, defaults to
         `CAPTION_LIMIT`.
-        :returns: a list of tokens - the caption.
+        :returns: a list of lists of tokens - the generated captions,
+        in the same order.
         :raises RuntimeError: if:
-         - `image` is str and the object does not support image loading
-         - `image` is a tensor (or loaded into a tensor) which does not
-           have the expected shape
+         - `images` contains paths but the object does not support image
+           loading
+         - `images` does not have the expected shape
         """
-        image = self.__prepare_if_path(image)
-        self.__validate_shape_of(image)
+        images = self.__prepare_if_paths(images)
+        self.__validate_shape_of(images)
 
-        return self.__caption_image(
-            image,
+        return self.__caption_images(
+            images,
             (limit
              if (limit is not None)
              else _CAPTION_LIMIT)
         )
 
-    def __prepare_if_path(self, image):
-        if (isinstance(image, str)):
+    def __prepare_if_paths(self, images):
+        if (images.dtype == tf.string):
             if (self.prepares_images):
-                image = prepare_image(image,
-                                      self.__image_encoder,
-                                      self.__target_size)
+                images = tf.constant([
+                    prepare_image(path.numpy().decode(),
+                                  self.__image_encoder,
+                                  self.__target_size).numpy()
+                    for path in images
+                ])
             else:
                 raise RuntimeError("Can't handle paths!")
 
-        return image
+        return images
 
-    def __validate_shape_of(self, image):
+    def __validate_shape_of(self, images):
         target_shape = self.__encoder.inputs[0].shape[1:]
+        actual_shape = images.shape[1:]
 
-        if (image.shape != target_shape):
+        if (actual_shape != target_shape):
             raise RuntimeError(
-                f"Image shape {tuple(image.shape)} does not "
+                f"Images shape {tuple(actual_shape)} does not "
                 f"match expected shape {tuple(target_shape)}!"
             )
 
-    def __caption_image(self, image, limit):
-        h_state = self.__encoder(tf.expand_dims(image, axis=0))
+    def __caption_images(self, images, limit):
+        h_state = self.__encoder(images)
         c_state = tf.zeros_like(h_state)
-        translation = []
-        word = self.__meta_tokens.start
+        captions = _Captions(self.__meta_tokens,
+                             batch_size=images.shape[0])
 
-        while (len(translation) < limit):
+        while (captions.max_length < limit and
+               not captions.all_finished):
             distribution, h_state, c_state = self.__distribution_after(
-                word,
+                captions.current_words,
                 h_state,
                 c_state
             )
-            word = self.__most_probable_word(distribution)
+            new_words = self.__most_probable_words(distribution)
+            captions.extend(new_words)
 
-            if (word != self.__meta_tokens.end):
-                translation.append(word)
-            else:
-                break
-
-        return translation
+        return captions.extract()
 
     def __distribution_after(self,
-                             word,
+                             current_words,
                              h_state,
                              c_state):
-        index = self.__tokenizer.word_index[word]
         return self.__decoder([
-            tf.constant([[index]]),
+            tf.constant([
+                [self.__tokenizer.word_index[w]]
+                for w in current_words
+            ],
+                dtype=tf.int32
+            ),
             h_state,
             c_state,
         ])
 
-    def __most_probable_word(self, probabilities):
-        samples = tf.random.categorical(probabilities, num_samples=1)
-        index = samples[0][0].numpy()
-
-        return self.__tokenizer.index_word[index]
+    def __most_probable_words(self, distribution):
+        samples = tf.random.categorical(distribution, num_samples=1)
+        return [self.__tokenizer.index_word[index.numpy()]
+                for index in samples[:, 0]]
 
 
 def generate_captions(images, generator, limit=None):
     """
-    A convenience function which takes an iterable of images and a
-    CaptionGenerator and invokes the generator on each image, producing
-    a Python generator of captions.
+    A convenience function which takes an iterable of batches of images
+    and a CaptionGenerator and invokes the generator on each batch,
+    producing a Python generator of batches of captions.
 
-    :param images: an iterable of strs (image paths) or of tf.Tensors
-    (prepared images or image features).
+    :param images: an iterable of tf.Tensors - batches of strs (image
+    paths) or of tf.Tensors (prepared images or image features).
     :param generator: an instance of CaptionGenerator. Note that it must
-    support image loading if `images` is an iterable of paths.
+    support image loading if `images` contains paths.
     :param limit: an unsigned int - a limit for a caption's length in
     tokens. If omitted or `None`, defaults to `CAPTION_LIMIT`.
-    :returns: a generator which invokes `generator` on each of the
-    images.
+    :returns: a generator which invokes `generator` on each tensor in
+    `images`.
     """
-    return (generator(i, limit) for i in images)
+    return (generator(ims, limit) for ims in images)
 
 
 def generate_captions_from_tensors(
@@ -295,8 +307,8 @@ def generate_captions_from_tensors(
 ):
     """
     A convenience function which creates a CaptionGenerator and invokes
-    it on each image in an iterable of tf.Tensors. See CaptionGenerator
-    and `generate_captions`.
+    it on each batch of images in an iterable of tf.Tensors. See
+    CaptionGenerator and `generate_captions`.
     """
     generator = CaptionGenerator(
         model,
@@ -310,25 +322,50 @@ def generate_captions_from_tensors(
 
 def generate_captions_from_paths(image_paths,
                                  model,
-                                 meta_tokens,
-                                 tokenizer,
-                                 image_options,
+                                 path_to_data,
+                                 batch_size=32,
+                                 meta_tokens=dp.MetaTokens(),
+                                 image_options=dp.ImageOptions(),
                                  caption_limit=None):
     """
-    A convenience function which creates a CaptionGenerator and invokes
-    it on each image in an iterable of image paths. See CaptionGenerator
-    and `generate_captions`.
-
-    Note that:
-     - `model` must be the entire model, including the encoder module
-     - the supported image formats are JPEG, PNG, GIF, BMP.
+    :param image_paths: an iterable of strs - paths of image files.
+    The supported image formats are JPEG, PNG, GIF, BMP.
+    :param model: an instance of the NIC model created with
+    `define_model` or `connect`. That is, an entire NIC model.
+    :param path_to_data: a str - the path of the directory where
+    preprocessed data is stored.
+    :param batch_size: an int - the batch size in which to process
+    images. Defaults to 32.
+    :param meta_tokens: an instance of MetaTokens - the meta tokens
+    with which the data was preprocessed.
+    :param image_options: the instance of ImageOptions used when
+    preprocessing the data.
+    :param caption_limit: an unsigned int - a limit for a caption's
+    length in tokens. If omitted or `None`, defaults to `CAPTION_LIMIT`.
+    :returns: a generator which yields strs - the captions generated
+    for the given images, in the same order.
     """
     generator = CaptionGenerator(
         model,
         meta_tokens,
-        tokenizer,
+        dp.load_tokenizer(path_to_data),
         is_decoder_only=False,
         image_options=image_options
     )
+    batches_of_paths = _chopped_into_batches(image_paths, batch_size)
 
-    return generate_captions(image_paths, generator, caption_limit)
+    batches_of_captions = generate_captions(batches_of_paths,
+                                            generator,
+                                            caption_limit)
+    tokenized_captions = itertools.chain.from_iterable(
+        batches_of_captions
+    )
+
+    return (" ".join(cap) for cap in tokenized_captions)
+
+
+def _chopped_into_batches(paths, batch_size):
+    return (
+        tf.constant(paths[start : start + batch_size])
+        for start in range(0, len(paths), batch_size)
+    )
