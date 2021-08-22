@@ -49,7 +49,8 @@ def train_model(*,
                 min_learning_rate=0.,
                 early_stop_patience=3,
                 max_epochs=10,
-                shuffle_for_each_epoch=False):
+                shuffle_for_each_epoch=False,
+                initial_epoch=0):
     """
     :param model: a compiled model. If a fresh training process is
     started, this should be the result of `compile_model`. For extra
@@ -95,6 +96,8 @@ def train_model(*,
     training. Defaults to 10.
     :param shuffle_for_each_epoch: a boolean value indicating whether to
     shuffle the training data prior to each epoch. Defaults to False.
+    :param initial_epoch: an int - the epoch number to start from.
+    Useful when training is being resumed. Defaults to 0.
     :returns: a pair of the training history (as returned by Model.fit)
     and a dict mapping metric names to the corresponding test values.
     """
@@ -123,6 +126,7 @@ def train_model(*,
         validation_data=val_data,
         callbacks=callbacks,
         shuffle=shuffle_for_each_epoch,
+        initial_epoch=initial_epoch
     )
 
     results = model.evaluate(test_data)
