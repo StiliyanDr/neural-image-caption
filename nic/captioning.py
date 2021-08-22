@@ -25,7 +25,7 @@ class _Captions:
             start_token = self.__meta_tokens.start
             batch_size = len(self.__captions)
 
-        self.__captions = [[start_token] for _ in batch_size]
+        self.__captions = [[start_token] for _ in range(batch_size)]
         self.__max_length = 0
 
     @property
@@ -58,7 +58,7 @@ class _Captions:
         :returns: a list of lists of strs - the captions without any
         meta tokens.
         """
-        end = self.__meta_tokens
+        end = self.__meta_tokens.end
 
         captions = [
             (c[1:-1]
