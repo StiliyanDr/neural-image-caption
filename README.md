@@ -8,6 +8,7 @@ A simple Python API built on top of [TensorFlow](https://www.tensorflow.org/) fo
  * [Installation](#installation)
  * [MSCOCO API](#mscoco-api)
  * [NIC Model](#nic-model)
+ * [Training on Google Colab](#training-on-colab)
 
 <a name="description"></a>
 
@@ -180,3 +181,19 @@ features_size = nic.dp.features_size(data_dir)
 <a name="nic-model"></a>
 
 ## NIC Model
+
+<a name="training-on-colab"></a>
+
+## Training on Google Colab
+
+[Google Colab](https://colab.research.google.com/) offers a Python environment with preinstalled packages like TensorFlow. It is also possible to request a GPU for a user allocated runtime. The runtimes have limited resources and even though Google Drive can be mounted, it most definitely wouldn't fit the entire MSCOCO dataset (the images in particular).  
+
+To take advantage of Colab, we can:  
+
+* preprocess the dataset on our machines once
+* create an archive file containing image features
+* upload it to Google Drive
+* extract the features into the runtime
+* train and evaluate a model using a GPU
+
+In fact, the *data.zip* file contains preprocessed MSCOCO data with image features extracted with Inception ResNet v2. The *neural_image_caption.ipynb* notebook can be used with this archive file to train and evaluate the decoder module of a model on Google Colab.  
