@@ -9,6 +9,7 @@ A simple Python API built on top of [TensorFlow](https://www.tensorflow.org/) fo
  * [MSCOCO API](#mscoco-api)
  * [NIC Model](#nic-model)
  * [Training on Google Colab](#training-on-colab)
+ * [References](#references)
 
 <a name="description"></a>
 
@@ -182,6 +183,261 @@ features_size = nic.dp.features_size(data_dir)
 
 ## NIC Model
 
+The other main part of the **nic** API is a neural network model that can be easily defined, trained on the MSCOCO dataset and then used to caption images.  
+
+The model has a Seq2Seq architecture which is depicted below.  
+![model_architecture](docs/architecture.PNG)
+
+Images are represented as 3D tensors which are fed into a CNN. The resulting feature vectors are transformed and fed into an RNN, as the initial hidden state vectors.  
+
+Captions are tokenized and each token is represented as a vector from a word embedding. The word embeddings are fed into the RNN as inputs.  
+
+The hidden state vectors at each time point (caption length) are transformed and projected over the vocabulary words/terms.  
+
+During training, the word projections are used to calculate the loss (categorical cross entropy). During inference, the projections are used to generate a word distribution that is used to select the next word in the caption.  
+
+The model is largely similar to the one described [here](https://ieeexplore.ieee.org/document/7505636?denied=).  
+
+### Defining the model
+
+First we need to import the API:  
+
+```python
+import nic
+```
+
+The CNN encoder module can be any model (built with TensorFlow 2) that transforms an image (3D tensor) into a vector. Remember that the encoder is important when preprocessing data too, as mentioned in the [MSCOCO](#mscoco-api) section. The **nic** API makes it easy to use Inception ResNet v2 via the following function call:  
+
+```python
+encoder = nic.define_encoder_model()
+```
+
+This returns the [Inception ResNet v2](https://www.tensorflow.org/api_docs/python/tf/keras/applications/inception_resnet_v2/InceptionResNetV2) model trained on ImageNet with the top layer removed and max-pooling applied so that the output is a vector.  
+
+The rest of the model (the RNN, word embeddings and so on) is referred to as 'decoder' below for simplicity (even though that is not what is typically called a decoder).  
+
+The decoder can be defined with the `define_decoder_model` function. It needs to be passed the features size, vocabulary size and some options for the RNN module. The first two can be obtained via the API from preprocessed data; docs are available for the `RNNOptions` (as well as for every public object from **nic**), use `help(nic.RNNOptions)` in an interpreter.  
+
+```python
+data_dir = r"data"
+rnn_options = nic.RNNOptions(size=256,
+                             dropout=0.0,
+                             recurrent_dropout=0.0,
+                             reverse_sequence=False)
+decoder = nic.define_decoder_model(
+    nic.dp.features_size(data_dir),
+    nic.dp.vocabulary_size(data_dir),
+    rnn_options,
+    name="nic-decoder"
+)
+```
+
+The two modules can be connected into a single model:  
+
+```python
+model = nic.connect(
+    decoder,
+    image_shape=(299, 299, 3),
+    encoder=encoder,
+    name="nic"
+)
+```
+
+The `image_shape` argument must be a three-tuple of integers - the shape of the input images, as expected by the encoder.  
+
+If the encoder module is going to be the default one - Inception ResNet v2, the model can be defined like so:  
+
+```python
+model = nic.define_model(nic.dp.vocabulary_size(data_dir), rnn_options)
+```
+
+### Training the model
+
+The model, or the decoder module only, can be trained on preprocessed MSCOCO data. First, the model (or decoder) needs to be compiled:  
+
+```python
+compiled_model = nic.compile_model(
+    model,
+    learning_rate=0.0001
+)
+```
+
+A compiled model can be trained with `train_model`:  
+
+```python
+checkpoint_dir = r"training/checkpoints"
+tensor_board_dir = r"training/tensor_board"
+
+history, test_metrics = nic.train_model(
+    model=compiled_model,
+    path_to_data=data_dir,
+    is_decoder_only=False,
+    batch_size=32,
+    buffer_size=1024,
+    tensor_board_dir=tensor_board_dir,
+    tensor_board_update_freq="epoch",
+    checkpoint_dir=checkpoint_dir,
+    checkpoint_freq="epoch",
+    learning_rate_decay=0.9,
+    decay_patience=3,
+    perplexity_delta=0.001,
+    min_learning_rate=0.,
+    early_stop_patience=3,
+    max_epochs=10,
+    shuffle_for_each_epoch=False,
+    initial_epoch=0
+)
+```
+
+This function trains the compiled model for at most `max_epochs` epochs, possibly shuffling the train data prior to each epoch (`shuffle_for_each_epoch`).  Resuming a training process is as easy as setting `initial_epoch` to the number of the last completed epoch and **increasing** `max_epochs`.   
+
+The initial learning rate is the compiled model's learning rate, if the process is started from scratch; restored models (mention in a bit) come with their optimizers which include the latest learning rate. If the validation perplexity does not improve with at least `perplexity_delta` for `decay_patience` epochs in a row, the learning rate is reduced my multiplying it with `learning_rate_decay` ($lr = decay * lr$​​). If `early_stop_patience` learning rate changes still lead to no perplexity improvement (or the loss becomes NaN), the training process is terminated.  
+
+TensorBoard logs go to `tensor_board_dir` with `tensor_board_update_freq` frequency. Checkpoints (`SavedModel`s) go to `checkpoint_dir` with `checkpoint_freq` frequency.  
+
+`buffer_size` is the size for the buffer used to shuffle the train data before training is started.  
+
+More details are available in the function's docs (`help(nic.train_model)`).  
+
+A model checkpoint can be restored like so:  
+
+```python
+compiled_model = nic.restore_model(checkpoint_dir, restore_best=False)
+```
+
+Setting `restore_best` to `True` would restore the model with the best validation perplexity. Otherwise, the latest checkpoint is loaded.  
+
+### Evaluating the model
+
+A compiled model (which can also be the decoder module only) can be evaluated by computing its [BLEU-4](https://aclanthology.org/P02-1040.pdf) score:  
+
+```python
+meta_tokens = nic.dp.MetaTokens()
+bleu_score = nic.bleu_score_of(
+    compiled_model,
+    is_decoder_only=False,
+    path_to_data=data_dir,
+    batch_size=32,
+    data_type="test",
+    meta_tokens=meta_tokens,
+    caption_limit=100,
+    verbose=True
+)
+```
+
+`data_type` can also be `"val"` or even `"train"`. `meta_tokens` should be the meta tokens used when preprocessing data, which are typically the default ones so this can be omitted. `caption_limit` is a limit for the captions generated from `data_type` images. Omitting it is means that there is no limit which is not a good idea for models that have not been trained for much time (as the captions are still pretty random and can be very long).  
+
+### Generating captions
+
+Captions can be generated by using `nic.CaptionGenerator`. It can be created from the entire model or the decoder module only.  
+
+Creating it from the decoder is restrictive as this means it will need to be fed image features, as returned by the encoder. This is useful when training the decoder as we can evaluate it without needing the images (which take up a lot of space).      
+
+Creating it from the entire model is useful when evaluating the model or at inference time, as we will need to process images (not image features). Here's an example:  
+
+```python
+image_options = nic.dp.ImageOptions()
+generator = nic.CaptionGenerator(
+    compiled_model,
+    meta_tokens=meta_tokens,
+    tokenizer=nic.dp.load_tokenizer(data_dir),
+    is_decoder_only=False,
+    image_options=image_options
+)
+```
+
+Again, `image_options` should be the image options used when preprocessing the data (same for `meta_tokens`).  
+
+A `nic.CaptionGenerator` instance generates captions for batches of images. A batch is represented as a `tf.Tensor` of:  
+
+* image paths or 3D image tensors, when the instance is created from the entire model
+* features vectors, when the instance is created from the decoder module only
+
+For example, we can call the above generator on a batch of image paths like this:  
+
+```python
+import tensorflow as tf
+
+image_paths = [
+    "images/cat.jpg",
+    "images/car.jpg",
+]
+captions = generator(tf.constant(image_paths), limit=None)
+```
+
+A list of captions (lists of `str` tokens) is returned. To limit the length of the captions, we can set `limit`.   
+
+The following example shows a batch of 3D image tensors being passed to the generator:  
+
+```python
+images, count = nic.dp.load_images(data_dir, type="val")
+images = images.batch(10)
+images_batch, ids_batch = next(iter(images))
+captions = generator(images_batch, limit=100)
+```
+
+Similarly, we could create the generator from the decoder module:  
+
+```python
+generator = nic.CaptionGenerator(
+    decoder,
+    meta_tokens=meta_tokens,
+    tokenizer=nic.dp.load_tokenizer(data_dir),
+    is_decoder_only=True
+)
+```
+
+There's no need for image options as this generator will be working with image features only:  
+
+```python
+images, count = nic.dp.load_images(data_dir, type="val", load_as_features=True)
+images = images.batch(10)
+images_batch, ids_batch = next(iter(images))
+captions = generator(images_batch, limit=100)
+```
+
+Once we have an iterable of batches, we can create a Python generator that calls the caption generator on each batch:  
+
+```python
+for captions_batch in nic.generate_captions(images, generator, limit=100):
+    pass
+```
+
+There's also a convenience function that creates the caption generator and then returns a Python generator that calls the caption generator on each batch of tensors in an iterable:  
+
+```python
+batches_of_captions = list(nic.generate_captions_from_tensors(
+    images,
+    decoder,
+    meta_tokens=meta_tokens,
+    tokenizer=nic.dp.load_tokenizer(data_dir),
+    is_decoder_only=True,
+    caption_limit=100,
+))
+```
+
+Finally, there's a high-level function that generates captions when given image paths. We also need to give it the entire model, the path to the preprocessed data, meta tokens and image options (if they are not the default ones), as well as the batch size to use and a caption limit:  
+
+```python
+images_paths = [
+    "images/cat.jpg",
+    "images/car.jpg",
+    "images/nature.jpg",
+]
+captions = nic.generate_captions_from_paths(
+    images_paths,
+    compiled_model,
+    path_to_data=data_dir,
+    batch_size=32,
+    meta_tokens=meta_tokens,
+    image_options=image_options,
+    caption_limit=100
+)
+image_captions = dict(zip(image_paths, captions))
+```
+
+The returned value is a Python generator which yields `str`s - the captions generated for the given images, in the same order. In the example above we pair each of the paths with the corresponding caption and create a mapping from the pairs.  
+
 <a name="training-on-colab"></a>
 
 ## Training on Google Colab
@@ -197,3 +453,9 @@ To take advantage of Colab, we can:
 * train and evaluate a model using a GPU
 
 In fact, the *data.zip* file contains preprocessed MSCOCO data with image features extracted with Inception ResNet v2. The *neural_image_caption.ipynb* notebook can be used with this archive file to train and evaluate the decoder module of a model on Google Colab.  
+
+<a name="References"></a>
+
+## References
+
+[O. Vinyals, A. Toshev, S. Bengio and D. Erhan](https://ieeexplore.ieee.org/document/7505636?denied=), "Show and Tell: Lessons Learned from the 2015 MSCOCO Image Captioning Challenge," in IEEE Transactions on Pattern Analysis and Machine Intelligence, vol. 39, no. 4, pp. 652-663, 1 April 2017, doi: 10.1109/TPAMI.2016.2587640.
