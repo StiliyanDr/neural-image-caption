@@ -1,4 +1,4 @@
 nltk
 numpy
-tensorflow
+tensorflow>=2.5
 tqdm
