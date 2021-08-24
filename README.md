@@ -186,7 +186,7 @@ features_size = nic.dp.features_size(data_dir)
 The other main part of the **nic** API is a neural network model that can be easily defined, trained on the MSCOCO dataset and then used to caption images.  
 
 The model has a Seq2Seq architecture which is depicted below.  
-![model_architecture](docs/architecture.PNG)
+![model_architecture](docs/architecture.png)
 
 Images are represented as 3D tensors which are fed into a CNN. The resulting feature vectors are transformed and fed into an RNN, as the initial hidden state vectors.  
 
