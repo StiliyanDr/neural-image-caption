@@ -41,15 +41,17 @@ The **nic** API makes it possible to download the dataset, preprocess the data a
 
 Note that the dataset is very big so downloading and preprocessing it will take up a lot of space. At the time of writing this, **an archive file** of the dataset is between 10 and 20 GB. This is why getting rid of the original data might be a good idea once it is preprocessed.  
 
-First we need to import the API.  
+First we need to import the API (and TensorFlow).  
 
 ```python
+import tensorflow as tf
+
 import nic
 ```
 
 ### Downloading
 
-Then we can download the dataset (from [here]("http://images.cocodataset.org")).  
+Then we can download the dataset (from [here](http://images.cocodataset.org)).  
 
 ```python
 mscoco_dir = r"mscoco"
@@ -153,6 +155,14 @@ The data is loaded into a `tf.data.Dataset` which yields 3-tuples whose componen
 * an integer vector which represents the same caption but this time without the start meta token in front
 
 The shape of the caption vectors is `(max_caption_length,)` and shorter captions are post-padded with 0 (the index of the padding meta token). The shape of the image or features tensor depends on the chosen CNN encoder.  
+
+------
+
+Keras models are typically trained with `tf.data.Dataset` objects which yield elements with a different structure (not  3-tuples). In order to train a model with the datasets returned by `load_data`, we'd need to customise `fit`, as explained [here](https://keras.io/guides/customizing_what_happens_in_fit/).  
+
+As described [later](#nic-model), the **nic** API can also be used to define and train a model with the MSCOCO dataset. The `CustomModel` class defined within **nic** can be used as an example for customizing `fit` to work with the datasets returned by `load_data`.  
+
+------
 
 There are a few more API functions that work with preprocessed data. The [tokenizer](https://www.tensorflow.org/api_docs/python/tf/keras/preprocessing/text/Tokenizer) can be loaded like this:  
 
@@ -298,7 +308,7 @@ The initial learning rate is the compiled model's learning rate, if the process 
 
 TensorBoard logs go to `tensor_board_dir` with `tensor_board_update_freq` frequency. Checkpoints (`SavedModel`s) go to `checkpoint_dir` with `checkpoint_freq` frequency.  
 
-`buffer_size` is the size for the buffer used to shuffle the train data before training is started.  
+`buffer_size` is the size of the buffer used to shuffle the train data before training is started.  
 
 More details are available in the function's docs (`help(nic.train_model)`).  
 
@@ -328,7 +338,7 @@ bleu_score = nic.bleu_score_of(
 )
 ```
 
-`data_type` can also be `"val"` or even `"train"`. `meta_tokens` should be the meta tokens used when preprocessing data, which are typically the default ones so this can be omitted. `caption_limit` is a limit for the captions generated from `data_type` images. Omitting it is means that there is no limit which is not a good idea for models that have not been trained for much time (as the captions are still pretty random and can be very long).  
+`data_type` can also be `"val"` or even `"train"`. `meta_tokens` should be the meta tokens used when preprocessing data, which are typically the default ones so this can be omitted. `caption_limit` is a limit for the captions generated from `data_type` images. Omitting it means that there is no limit which is not a good idea for models that have not been trained for much time (as the captions are still pretty random and can be very long).  
 
 ### Generating captions
 
