@@ -196,6 +196,9 @@ The hidden state vectors at each time point (caption length) are transformed and
 
 During training, the word projections are used to calculate the loss (categorical cross entropy). During inference, the projections are used to generate a word distribution that is used to select the next word in the caption.  
 
+The CNN image encoder is typically a pretrained model, like Inception ResNet v2. The rest of the model, visualised with `tf.keras.utils.plot_model`, looks like this (the RNN's hidden size is 512 in this case):  
+![decoder_functional](docs/decoder.png)
+
 The model is largely similar to the one described [here](https://ieeexplore.ieee.org/document/7505636?denied=).  
 
 ### Defining the model
