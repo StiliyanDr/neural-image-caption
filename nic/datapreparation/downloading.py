@@ -17,19 +17,16 @@ def download_mscoco(directory=None, version="2017"):
     Downloads the MS-COCO image captioning dataset.
 
     :param directory: a str - the directory where to download the data.
-    If omitted, defaults to './mscoco' which is created if it does not
-    exist. The dataset is overwritten if it already exists.
+    If omitted, defaults to './mscoco'. The directory is created if it
+    does not exist. The dataset is overwritten if it already exists.
     :param version: a str - the year the data was published. Defaults to
     2017.
     """
     if (directory is None):
         directory = "mscoco"
 
-        if (not os.path.exists(directory)):
-            os.mkdir(directory)
-
     if (not os.path.exists(directory)):
-        raise FileNotFoundError(f"'{directory}' does not exist!")
+        os.mkdir(directory)
 
     _do_download_mscoco_to(directory, version)
 
