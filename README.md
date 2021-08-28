@@ -465,7 +465,7 @@ To take advantage of Colab, we can:
 * extract the features into the runtime
 * train and evaluate a model using a GPU
 
-In fact, the *data.zip* file contains preprocessed MSCOCO data with image features extracted with Inception ResNet v2. The *neural_image_caption.ipynb* notebook can be used with this archive file to train and evaluate the decoder module of a model on Google Colab.  
+In fact, the *data* directory contains preprocessed MSCOCO data with image features extracted with Inception ResNet v2. Each of the two archives - *max.zip* and *avg.zip* - is a separate instance of preprocessed data; the name indicates the global pooling applied to the output of the last convolutional block when extracting image features. The *neural_image_caption.ipynb* notebook can be used with any of the archive files to train and evaluate the decoder module of a model on Google Colab.  
 
 <a name="References"></a>
 
