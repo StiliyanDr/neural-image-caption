@@ -166,7 +166,7 @@ def vocabulary_size(path):
     data.
     """
     tokenizer = load_tokenizer(path)
-    return len(tokenizer.word_index)
+    return tokenizer.num_words
 
 
 def features_size(path):
