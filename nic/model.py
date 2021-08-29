@@ -51,11 +51,22 @@ class RNNOptions(NamedTuple):
      - reverse_sequence: a boolean value indicating whether the input
        sequence should be fed backwards (end to start) into the RNN.
        Defaults to `False`
+     - kernel_initializer: a str - the initializer for the kernel
+       weights matrix, used for the linear transformation of the inputs.
+       Defaults to "glorot_uniform"
+     - recurrent_initializer: a str - the initializer for the
+       recurrent_kernel weights matrix, used for the linear
+       transformation of the recurrent state. Defaults to "orthogonal"
+     - bias_initializer: a str - the initializer for the bias vector.
+       Defaults to "zeros"
     """
     size: int
     dropout: float = 0.0
     recurrent_dropout: float = 0.0
     reverse_sequence: bool = False
+    kernel_initializer: str = "glorot_uniform"
+    recurrent_initializer: str = "orthogonal"
+    bias_initializer: str = "zeros"
 
 
 def define_decoder_model(features_size,
@@ -104,6 +115,9 @@ def define_decoder_model(features_size,
     # (batch_size, hidden_size)
     decoded_captions, h_state, c_state = layers.LSTM(
         rnn_options.size,
+        kernel_initializer=rnn_options.kernel_initializer,
+        recurrent_initializer=rnn_options.recurrent_initializer,
+        bias_initializer=rnn_options.bias_initializer,
         dropout=rnn_options.dropout,
         recurrent_dropout=rnn_options.recurrent_dropout,
         go_backwards=rnn_options.reverse_sequence,

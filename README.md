@@ -233,10 +233,7 @@ The decoder can be defined with the `define_decoder_model` function. It needs to
 
 ```python
 data_dir = r"data"
-rnn_options = nic.RNNOptions(size=256,
-                             dropout=0.0,
-                             recurrent_dropout=0.0,
-                             reverse_sequence=False)
+rnn_options = nic.RNNOptions(size=256)
 decoder = nic.define_decoder_model(
     nic.dp.features_size(data_dir),
     nic.dp.vocabulary_size(data_dir),
