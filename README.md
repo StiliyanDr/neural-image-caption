@@ -229,15 +229,17 @@ This returns the [Inception ResNet v2](https://www.tensorflow.org/api_docs/pytho
 
 The rest of the model (the RNN, word embeddings and so on) is referred to as 'decoder' below for simplicity (even though that is not what is typically called a decoder).  
 
-The decoder can be defined with the `define_decoder_model` function. It needs to be passed the features size, vocabulary size and some options for the RNN module. The first two can be obtained via the API from preprocessed data; docs are available for the `RNNOptions` (as well as for every public object from **nic**), use `help(nic.RNNOptions)` in an interpreter.  
+The decoder can be defined with the `define_decoder_model` function. It needs to be passed the features size, vocabulary size, embedding size and some options for the RNN module. The first two can be obtained via the API from preprocessed data; docs are available for the `RNNOptions` (as well as for every public object from **nic**), use `help(nic.RNNOptions)` in an interpreter. The embedding size defaults to the RNN's hidden size.  
 
 ```python
 data_dir = r"data"
 rnn_options = nic.RNNOptions(size=256)
+embedding_size = None
 decoder = nic.define_decoder_model(
     nic.dp.features_size(data_dir),
     nic.dp.vocabulary_size(data_dir),
     rnn_options,
+    embedding_size,
     name="nic-decoder"
 )
 ```
@@ -258,7 +260,9 @@ The `image_shape` argument must be a three-tuple of integers - the shape of the 
 If the encoder module is going to be the default one - Inception ResNet v2, the model can be defined like so:  
 
 ```python
-model = nic.define_model(nic.dp.vocabulary_size(data_dir), rnn_options)
+model = nic.define_model(nic.dp.vocabulary_size(data_dir),
+                         rnn_options,
+                         embedding_size)
 ```
 
 ### Training the model

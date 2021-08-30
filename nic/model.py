@@ -72,6 +72,7 @@ class RNNOptions(NamedTuple):
 def define_decoder_model(features_size,
                          vocabulary_size,
                          rnn_options,
+                         embedding_size=None,
                          name="nic-decoder"):
     """
     Defines the NIC model without the CNN encoder part.
@@ -82,6 +83,8 @@ def define_decoder_model(features_size,
     extracted from the train captions.
     :param rnn_options: an instance of RNNOptions to be used to set up
     the RNN module of the model.
+    :param embedding_size: an int - the size of word embeddings. If
+    omitted or None, defaults to `rnn_options.size`.
     :param name: a str - the name of the resulting model. Defaults to
     `nic-decoder`.
     :returns: a `tf.keras.Model` instance whose inputs are:
@@ -103,10 +106,13 @@ def define_decoder_model(features_size,
     captions_input = layers.Input(shape=(None,),
                                   dtype=tf.int32,
                                   name="captions")
+    embedding_size = (rnn_options.size
+                      if (embedding_size is None)
+                      else embedding_size)
     # (batch_size, max_seq_len, embedding_size)
     embedded_captions = layers.Embedding(
         vocabulary_size,
-        rnn_options.size,
+        embedding_size,
         name="word-embedding"
     )(captions_input)
 
@@ -208,7 +214,8 @@ def connect(decoder_model, *,
 
 
 def define_model(vocabulary_size,
-                 rnn_options):
+                 rnn_options,
+                 embedding_size=None):
     """
     Defines the whole NIC model.
 
@@ -216,6 +223,8 @@ def define_model(vocabulary_size,
     extracted from the train data.
     :param rnn_options: an instance of RNNOptions describing the RNN
     module of the model.
+    :param embedding_size: an int - the size of word embeddings. If
+    omitted or None, defaults to `rnn_options.size`.
     :returns: a `tf.keras.Model` whose inputs are:
      - images: (batch_size, 299, 299, 3)
      - captions: (batch_size, max_seq_len)
@@ -229,6 +238,7 @@ def define_model(vocabulary_size,
         features_size,
         vocabulary_size,
         rnn_options,
+        embedding_size,
         name="nic-decoder"
     )
 
