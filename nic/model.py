@@ -5,6 +5,9 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 
+_DEFAULT_POOLING = "max"
+
+
 class CustomModel(keras.Model):
     """
     An extended model which is needed due to the format of the data;
@@ -151,21 +154,26 @@ def define_decoder_model(features_size,
                        name=name)
 
 
-def define_encoder_model():
+def define_encoder_model(pooling=None):
     """
     Defines and returns the CNN encoder part of the NIC model which is
     Inception ResNet v2 trained on ImageNet with the top layer removed
-    and max-pooling applied so that the output is a vector.
+    and max or average pooling applied so that the output is a vector.
 
+    :param pooling: a str - the pooling to apply after the last
+    convolutional layer. Can be `'max'` (the default) or `'avg'`.
     :returns: a `tf.keras.Model` whose input is a preprocessed image
     of shape (299, 299, 3) and whose output is a features vector of
     shape (1536,).
     """
+    if (pooling is None):
+        pooling = _DEFAULT_POOLING
+
     image_encoder = \
         tf.keras.applications.inception_resnet_v2.InceptionResNetV2(
             include_top=False,
             weights="imagenet",
-            pooling="max"
+            pooling=pooling
         )
     return tf.keras.Model(image_encoder.input,
                           image_encoder.layers[-1].output,
@@ -185,8 +193,9 @@ def connect(decoder_model, *,
     images, as expected by the encoder model.
     :param encoder_model: the encoder model which is assumed to work on
     image tensors and to return a single vector for each image - the
-    features corresponding to the image. If omitted or `None`, this is
-    the model defined by `define_encoder_model`.
+    features corresponding to the image. If `None` (the default), or
+    str, this is the model defined by
+    `define_encoder_model(pooling=encoder_model)`.
     :param name: a str - the name of the resulting model.
     :returns: a `tf.keras.Model` whose inputs are:
      - images: (batch_size, image_shape...)
@@ -195,8 +204,10 @@ def connect(decoder_model, *,
      - word projections: (batch_size, max_seq_len, vocabulary_size)
     Use keras.utils.plot_model to view the entire model.
     """
-    if (encoder_model is None):
-        encoder_model = define_encoder_model()
+    if (encoder_model is None or isinstance(encoder_model, str)):
+        encoder_model = define_encoder_model(
+            pooling=encoder_model
+        )
 
     images = layers.Input(shape=image_shape,
                           name="images-input")
@@ -215,7 +226,8 @@ def connect(decoder_model, *,
 
 def define_model(vocabulary_size,
                  rnn_options,
-                 embedding_size=None):
+                 embedding_size=None,
+                 pooling=None):
     """
     Defines the whole NIC model.
 
@@ -225,6 +237,9 @@ def define_model(vocabulary_size,
     module of the model.
     :param embedding_size: an int - the size of word embeddings. If
     omitted or None, defaults to `rnn_options.size`.
+    :param pooling: a str - the type of pooling to apply to the last
+    convolutional layer of the encoder. See `define_encoder_model`.
+    Defaults to `None`.
     :returns: a `tf.keras.Model` whose inputs are:
      - images: (batch_size, 299, 299, 3)
      - captions: (batch_size, max_seq_len)
@@ -232,7 +247,7 @@ def define_model(vocabulary_size,
      - word projections: (batch_size, max_seq_len, vocabulary_size)
     Use keras.utils.plot_model to view the entire model.
     """
-    encoder = define_encoder_model()
+    encoder = define_encoder_model(pooling)
     features_size = encoder.layers[-1].output_shape[-1]
     decoder = define_decoder_model(
         features_size,

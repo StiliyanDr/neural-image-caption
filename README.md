@@ -222,10 +222,11 @@ import nic
 The CNN encoder module can be any model (built with TensorFlow 2) that transforms an image (3D tensor) into a vector. Remember that the encoder is important when preprocessing data too, as mentioned in the [MSCOCO](#mscoco-api) section. The **nic** API makes it easy to use Inception ResNet v2 via the following function call:  
 
 ```python
-encoder = nic.define_encoder_model()
+pooling = "max"
+encoder = nic.define_encoder_model(pooling)
 ```
 
-This returns the [Inception ResNet v2](https://www.tensorflow.org/api_docs/python/tf/keras/applications/inception_resnet_v2/InceptionResNetV2) model trained on ImageNet with the top layer removed and max-pooling applied so that the output is a vector.  
+This returns the [Inception ResNet v2](https://www.tensorflow.org/api_docs/python/tf/keras/applications/inception_resnet_v2/InceptionResNetV2) model trained on ImageNet with the top layer removed and global pooling applied to the last convolutional layer so that the output is a vector. `pooling` can be `"max"` or `"avg"`.  
 
 The rest of the model (the RNN, word embeddings and so on) is referred to as 'decoder' below for simplicity (even though that is not what is typically called a decoder).  
 
@@ -262,7 +263,8 @@ If the encoder module is going to be the default one - Inception ResNet v2, the 
 ```python
 model = nic.define_model(nic.dp.vocabulary_size(data_dir),
                          rnn_options,
-                         embedding_size)
+                         embedding_size,
+                         pooling)
 ```
 
 ### Training the model
